@@ -4,7 +4,7 @@
   "description": "Apex Legendsチーム均衡化ツール「チーム決め一発くん」のフロントエンド",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc && vite build",
+    "build": "vite build",
     "preview": "vite preview",
     "type-check": "vue-tsc --noEmit"
   },
