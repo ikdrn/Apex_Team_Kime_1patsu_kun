@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<!--
+  index.html - VueアプリケーションのエントリーポイントとなるHTMLファイル
+
+  【役割】
+  - Viteがビルドを開始する起点となるHTMLファイル
+  - <div id="app"> にVueアプリがマウントされる
+  - Googleフォント（Noto Sans JP）の読み込み
+  - ファビコン設定（実際のファイルは後で追加可能）
+-->
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- SEO・ソーシャルシェア用メタタグ -->
+  <meta name="description" content="Apex Legendsのプレイヤーをランクに基づいて公平にチーム分けするツール" />
+  <meta property="og:title" content="チーム決め一発くん" />
+  <meta property="og:description" content="Apex Legendsのチーム均衡化ツール" />
+
+  <!-- タイトル -->
+  <title>チーム決め一発くん | Apex Legends Team Balancer</title>
+
+  <!--
+    Noto Sans JP の読み込み（Google Fonts）
+    preconnect でDNSルックアップを先行して解決しておく（パフォーマンス改善）
+  -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+</head>
+<body class="bg-white text-neutral-900 antialiased">
+  <!--
+    Vueアプリのマウントポイント
+    main.ts の createApp(App).mount('#app') でここにVueがマウントされる
+  -->
+  <div id="app"></div>
+
+  <!--
+    type="module" でES Modulesとして読み込む
+    Viteがビルド時にこのタグを実際のバンドルファイルのパスに変換する
+  -->
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

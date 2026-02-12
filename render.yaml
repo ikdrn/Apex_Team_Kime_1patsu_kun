@@ -1,0 +1,65 @@
+# ============================================================
+# render.yaml - Render.com Blueprint 設定ファイル
+#
+# 【このファイルの役割】
+# Render.com の「Blueprint」機能を使って、インフラ構成を
+# コードとして管理（IaC: Infrastructure as Code）するためのファイル。
+# このファイルをリポジトリに含めてRenderにデプロイすると、
+# 自動的にサービスが作成・設定される。
+#
+# 【デプロイ手順】
+# 1. GitHubにこのリポジトリをプッシュする
+# 2. Render.com にアクセス → New → Blueprint
+# 3. リポジトリを選択 → render.yaml が自動検出される
+# 4. 「Apply」ボタンでデプロイ開始
+#
+# 【無料プランの制限】
+# - Freeプランではインスタンスが15分非アクティブでスリープする
+# - 最初のリクエストに数秒〜数十秒かかることがある
+# - メモリは512MB
+# ============================================================
+
+services:
+  # ── Webサービスの定義 ──
+  - type: web                          # Webサービスとして登録（HTTPSエンドポイントが提供される）
+    name: apex-team-balancer           # サービス名（Renderダッシュボードに表示される名前）
+
+    # ── ランタイム設定 ──
+    env: docker                        # Dockerを使ってデプロイ（Dockerfile を使用）
+    dockerfilePath: ./Dockerfile       # Dockerfile のパス（リポジトリルートからの相対パス）
+
+    # ── プラン設定 ──
+    # "free" = 無料プラン（本番運用ならstarter以上を推奨）
+    # 無料プランは RAM 512MB、スリープあり
+    plan: free
+
+    # ── ポート設定 ──
+    # Renderは自動的に PORT 環境変数をセットする
+    # Rustサーバー側でこの変数を読み取っている
+    port: 8080
+
+    # ── ヘルスチェックパス ──
+    # Renderがデプロイ後にここにGETリクエストを送り、
+    # 200が返れば「デプロイ成功」と判断する
+    healthCheckPath: /health
+
+    # ── 環境変数 ──
+    envVars:
+      # RUST_LOG: ログレベルの設定
+      # "info" でINFO以上のログを出力（本番環境向け）
+      # デバッグ時は "debug" に変更するとより詳しいログが出る
+      - key: RUST_LOG
+        value: info
+
+    # ── 自動デプロイ設定 ──
+    # mainブランチにpushするたびに自動でデプロイが走る
+    autoDeploy: true
+
+    # ── ビルドフィルター（オプション）──
+    # 以下のファイルが変更された場合のみビルドを実行する
+    # （コメントを外すと、他のファイルの変更ではビルドしなくなる）
+    # buildFilter:
+    #   paths:
+    #     - backend/**
+    #     - frontend/**
+    #     - Dockerfile

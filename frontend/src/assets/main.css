@@ -1,0 +1,150 @@
+/*
+ * main.css - グローバルスタイル定義
+ *
+ * 【役割】
+ * Tailwind CSSの基本スタイルをインポートし、
+ * プロジェクト全体に適用するカスタムCSSを定義する。
+ */
+
+/* Tailwind CSSの3層ディレクティブ */
+@tailwind base;       /* リセットスタイル（ブラウザ差異を統一） */
+@tailwind components; /* コンポーネントクラス */
+@tailwind utilities;  /* ユーティリティクラス（主な使用箇所） */
+
+/* ══════════════════════════════════════════════════════════
+   カスタムベーススタイル
+   （Tailwindのbase層を上書き・補完する）
+   ══════════════════════════════════════════════════════════ */
+@layer base {
+  /* ルート要素のデフォルトスタイル */
+  html {
+    /* フォントレンダリングの最適化 */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* スクロールを滑らかに */
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-white text-neutral-900;
+    font-family: 'Noto Sans JP', ui-sans-serif, system-ui, sans-serif;
+    /* 最小の縦幅をビューポートの高さに */
+    min-height: 100vh;
+  }
+
+  /* 見出し要素のデフォルトウェイト */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   カスタムコンポーネントクラス
+   よく使うパターンをまとめたユーティリティクラス群
+   ══════════════════════════════════════════════════════════ */
+@layer components {
+  /* プライマリボタン（主なアクション） */
+  .btn-primary {
+    @apply
+      inline-flex items-center justify-center
+      px-5 py-2.5
+      bg-primary-700 text-white
+      text-sm font-medium tracking-wide
+      border border-primary-700
+      hover:bg-primary-800 hover:border-primary-800
+      focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2
+      disabled:opacity-40 disabled:cursor-not-allowed
+      transition-colors duration-150;
+  }
+
+  /* アクセントボタン（チーム分け実行など、重要アクション） */
+  .btn-accent {
+    @apply
+      inline-flex items-center justify-center
+      px-5 py-2.5
+      bg-accent-600 text-white
+      text-sm font-medium tracking-wide
+      border border-accent-600
+      hover:bg-accent-700 hover:border-accent-700
+      focus:outline-none focus:ring-2 focus:ring-accent-400 focus:ring-offset-2
+      disabled:opacity-40 disabled:cursor-not-allowed
+      transition-colors duration-150;
+  }
+
+  /* セカンダリボタン（キャンセルなど） */
+  .btn-secondary {
+    @apply
+      inline-flex items-center justify-center
+      px-5 py-2.5
+      bg-white text-neutral-700
+      text-sm font-medium tracking-wide
+      border border-neutral-300
+      hover:bg-neutral-50 hover:border-neutral-400
+      focus:outline-none focus:ring-2 focus:ring-neutral-300 focus:ring-offset-2
+      disabled:opacity-40 disabled:cursor-not-allowed
+      transition-colors duration-150;
+  }
+
+  /* 危険ボタン（削除など） */
+  .btn-danger {
+    @apply
+      inline-flex items-center justify-center
+      px-3 py-1.5
+      bg-white text-red-600
+      text-xs font-medium
+      border border-red-200
+      hover:bg-red-50 hover:border-red-300
+      focus:outline-none focus:ring-1 focus:ring-red-300 focus:ring-offset-1
+      transition-colors duration-150;
+  }
+
+  /* テキスト入力フィールド */
+  .input-field {
+    @apply
+      block w-full
+      px-3 py-2
+      bg-white text-neutral-900
+      text-sm
+      border border-neutral-300
+      focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+      placeholder-neutral-400
+      transition-colors duration-150;
+  }
+
+  /* セレクトボックス（ドロップダウン） */
+  .select-field {
+    @apply
+      block w-full
+      px-3 py-2
+      bg-white text-neutral-900
+      text-sm
+      border border-neutral-300
+      focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500
+      transition-colors duration-150
+      cursor-pointer;
+    /* ブラウザデフォルトの矢印を非表示にしてカスタムにする */
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+    background-position: right 0.5rem center;
+    background-repeat: no-repeat;
+    background-size: 1.5em 1.5em;
+    padding-right: 2.5rem;
+  }
+
+  /* カード（白背景 + ボーダー） */
+  .card {
+    @apply
+      bg-white
+      border border-neutral-200
+      p-5;
+  }
+
+  /* セクションの見出し（太い横ボーダー付き） */
+  .section-heading {
+    @apply
+      text-xs font-semibold uppercase tracking-widest
+      text-neutral-500
+      pb-2 mb-4
+      border-b border-neutral-200;
+  }
+}
