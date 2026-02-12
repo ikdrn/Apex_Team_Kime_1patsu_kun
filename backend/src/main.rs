@@ -1,5 +1,5 @@
 // ============================================================
-// main.rs - チーム決め一発くん バックエンドサーバー
+// main.rs - チーム決め一発くん バックエンドサーバー（修正版 v2）
 //
 // 【このファイルの概要】
 // Apex Legendsのプレイヤー管理とチーム均衡化ロジックを提供するAPIサーバー。
@@ -12,33 +12,42 @@
 //   GET    /api/config              - 設定取得（チーム数など）
 //   PUT    /api/config              - 設定更新
 //   POST   /api/teams/balance       - チーム分け実行
-//   GET    /api/teams               - 最後に実行したチーム分け結果取得
-//   GET    /health                  - ヘルスチェック（Renderのデプロイ確認用）
-//   GET    /                        - Vueアプリの静的ファイル配信（本番用）
+//   GET    /api/teams               - チーム分け結果取得
+//   GET    /health                  - ヘルスチェック（Renderの起動確認用）
+//   GET    /**                      - Vueアプリの静的ファイル配信（SPA対応）
 //
-// 状態管理はデータベースを使わず、メモリ上の Arc<Mutex<AppState>> で行う。
-// サーバーを再起動するとデータはリセットされる点に注意。
+// ────────────────────────────────────────────────────────────
+// 【Renderデプロイ時の重要ポイント】
+//
+//   Renderは起動時に PORT 環境変数を自動的にセットする。
+//   このコードは std::env::var("PORT") でその値を読み取り、
+//   0.0.0.0:PORT でリッスンする。
+//
+//   0.0.0.0 = すべてのネットワークインターフェースで受け付ける（必須）
+//   127.0.0.1 にバインドすると外部から繋がらない！
+//
+// 状態管理は Arc<RwLock<AppState>> でスレッドセーフに行う。
+// RwLock は Mutex と違い、読み取りを同時複数スレッドに許可するため
+// 読み取り頻度が高いAPIに適している。
 // ============================================================
 
-// 使用するモジュールのインポート
-// `use` はRustにおけるimport文に相当する
 use axum::{
-    extract::{Path, State},   // URLパスパラメータとアプリケーション状態を取り出す
-    http::{Method, StatusCode, Uri}, // HTTPメソッド・ステータスコード・URI型
-    response::{IntoResponse, Json},  // レスポンス生成ユーティリティ
-    routing::{delete, get, post, put}, // HTTPメソッドに対応するルーティング関数
-    Router,                            // ルーター本体
+    extract::{Path, State}, // URLパスパラメータとアプリケーション状態
+    http::{Method, StatusCode},
+    response::{IntoResponse, Json},
+    routing::{delete, get, post, put},
+    Router,
 };
-use serde::{Deserialize, Serialize}; // JSON変換用マクロ
+use serde::{Deserialize, Serialize};
 use std::{
-    collections::HashMap, // キーと値のペアを管理するハッシュマップ
-    sync::{Arc, Mutex},   // スレッド間でデータを安全に共有するためのスマートポインタ
+    collections::HashMap,
+    sync::{Arc, RwLock}, // Mutexより読み取り並行性が高いRwLockを使用
 };
 use tower_http::{
-    cors::{Any, CorsLayer}, // CORS（クロスオリジン）設定
-    services::ServeDir,     // 静的ファイル配信
+    cors::{Any, CorsLayer},
+    services::{ServeDir, ServeFile}, // ServeDir=ディレクトリ配信, ServeFile=単一ファイル配信
 };
-use uuid::Uuid; // ユニークID生成
+use uuid::Uuid;
 
 // ============================================================
 // データ構造の定義
@@ -47,12 +56,8 @@ use uuid::Uuid; // ユニークID生成
 // ───────────────────────────────────────────────────────────
 // Rank: プレイヤーのランク列挙型
 //
-// Apex Legendsの公式ランク体系に対応。
-// derive マクロで以下の機能を自動実装する:
-//   - Debug: デバッグ表示（println!("{:?}", rank) で使える）
-//   - Clone: .clone() でコピーを作れる
-//   - Serialize/Deserialize: JSONとの相互変換
-//   - PartialEq: == 演算子での比較
+// serde(rename = "...") で JSON との変換時に日本語文字列を使う。
+// フロントエンドのドロップダウン値と完全に一致させること。
 // ───────────────────────────────────────────────────────────
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum Rank {
@@ -74,80 +79,64 @@ pub enum Rank {
 
 impl Rank {
     // ─────────────────────────────────────────────────────
-    // score() - ランクの「戦力スコア」を返すメソッド
+    // score() - ランクの「戦力スコア」を返す
     //
-    // 【なぜこのスコアが必要か】
-    // チーム分けを公平にするため、各ランクに数値を割り当てる。
-    // この数値の大小でプレイヤーの強さを表現し、
-    // 各チームの合計スコアが均等になるようにアルゴリズムで利用する。
+    // 【設計の意図】
+    // 上位ランク（マスター・プレデター）のスコアを意図的に
+    // 非線形に大きくすることで、貪欲法によるチーム分けが
+    // これらの強いプレイヤーを自動的に分散させる効果がある。
     //
-    // スコア設計の考え方:
-    //   ブロンズ〜ダイヤモンドは線形（1〜5）
-    //   マスターとプレデターは上位ランクの希少性を考慮して
-    //   非線形に大きいスコアを設定することで、
-    //   強いプレイヤーが同じチームに集まりにくくなる
+    //   ブロンズ(1) シルバー(2) ゴールド(3) プラチナ(5)
+    //   ダイヤモンド(7) マスター(10) プレデター(15)
     // ─────────────────────────────────────────────────────
     pub fn score(&self) -> u32 {
         match self {
-            Rank::Bronze   => 1,  // 最初のランク
+            Rank::Bronze   => 1,
             Rank::Silver   => 2,
             Rank::Gold     => 3,
-            Rank::Platinum => 5,  // プラチナから一段階差をつける
+            Rank::Platinum => 5,
             Rank::Diamond  => 7,
-            Rank::Master   => 10, // 上位ランクは大きく差をつける
-            Rank::Predator => 15, // 最上位は圧倒的に高いスコア
+            Rank::Master   => 10,
+            Rank::Predator => 15,
         }
     }
 }
 
 // ───────────────────────────────────────────────────────────
-// Player: プレイヤー情報を表す構造体
+// Player: プレイヤー情報の構造体
 // ───────────────────────────────────────────────────────────
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Player {
-    /// プレイヤーを一意に識別するUUID（例: "550e8400-e29b-41d4-a716-446655440000"）
+    /// バックエンドが生成したUUID（変更不可の一意識別子）
     pub id: String,
-    /// プレイヤー名（画面入力値）
+    /// プレイヤー名（入力値。重複可）
     pub name: String,
-    /// ランク（上記のRank列挙型）
+    /// ランク
     pub rank: Rank,
-    /// チーム分け実行後に重複名があった場合の表示名
-    /// 例: "あかし" が2人いたら "あかし(1)", "あかし(2)"
-    /// 通常時は None（表示名は name と同じ）
+    /// チーム分け後に重複名があれば "名前(1)","名前(2)" 形式でセットされる
+    /// 通常時は None → フロント側で name をそのまま表示する
     pub display_name: Option<String>,
 }
 
-impl Player {
-    // ─────────────────────────────────────────────────────
-    // display() - 実際に画面に表示すべき名前を返す
-    //
-    // display_name が設定されていればそちらを返し、
-    // なければ通常の name を返す便利メソッド
-    // ─────────────────────────────────────────────────────
-    pub fn display(&self) -> &str {
-        self.display_name.as_deref().unwrap_or(&self.name)
-    }
-}
-
 // ───────────────────────────────────────────────────────────
-// Team: チームを表す構造体
+// Team: チーム情報の構造体
 // ───────────────────────────────────────────────────────────
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Team {
     /// チーム番号（1始まり）
     pub id: usize,
-    /// このチームに属するプレイヤーのリスト
+    /// このチームのプレイヤーリスト
     pub players: Vec<Player>,
-    /// チームの合計スコア（均衡化の指標として利用）
+    /// チームの合計スコア（均衡度の指標）
     pub total_score: u32,
 }
 
 // ───────────────────────────────────────────────────────────
-// AppConfig: アプリケーション設定
+// AppConfig: アプリ設定
 // ───────────────────────────────────────────────────────────
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    /// 分けるチームの数（デフォルト: 2）
+    /// 作るチームの数（デフォルト: 2、管理者が変更可能）
     pub team_count: usize,
 }
 
@@ -158,285 +147,249 @@ impl Default for AppConfig {
 }
 
 // ───────────────────────────────────────────────────────────
-// AppState: サーバーが保持するすべての状態
+// AppState: サーバーが保持するすべての状態（インメモリDB）
 //
-// Arc<Mutex<AppState>> でラップして複数スレッドから安全にアクセスする。
-// - Arc  = 参照カウント付きスマートポインタ（複数の所有者を持てる）
-// - Mutex = 同時アクセスを防ぐロック機構
+// 【なぜ Arc<RwLock<AppState>> を使うのか】
+//
+//   Axumは複数スレッドでリクエストを並行処理する。
+//   そのため状態を共有するにはスレッドセーフな仕組みが必要。
+//
+//   Arc   = Atomic Reference Counted ポインタ
+//           複数スレッドから同じデータを「共同所有」できる
+//
+//   RwLock = Read-Write Lock（読み書きロック）
+//           ・読み取り（read_lock）: 複数スレッドが同時にOK
+//           ・書き込み（write_lock）: 1スレッドのみ、他は待つ
+//
+//   読み取りAPIが多く書き込みAPIが少ない本アプリに最適。
+//   Mutexは読み取りも排他なのでRwLockの方が効率が良い。
 // ───────────────────────────────────────────────────────────
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct AppState {
-    /// 現在登録されているプレイヤーのリスト
+    /// 登録済みプレイヤーリスト
     pub players: Vec<Player>,
-    /// 最後に実行したチーム分けの結果（まだ実行していなければNone）
+    /// 最後のチーム分け結果（未実行なら None）
     pub teams: Option<Vec<Team>>,
-    /// アプリケーション設定
+    /// アプリ設定
     pub config: AppConfig,
 }
 
-impl Default for AppState {
-    fn default() -> Self {
-        Self {
-            players: Vec::new(),
-            teams: None,
-            config: AppConfig::default(),
-        }
-    }
-}
+// ── 型エイリアス（毎回 Arc<RwLock<AppState>> と書くのが大変なので）──
+type SharedState = Arc<RwLock<AppState>>;
 
 // ============================================================
-// APIリクエスト/レスポンスの型定義
+// APIリクエスト/レスポンス型定義
 // ============================================================
 
-/// プレイヤー追加リクエストのボディ
 #[derive(Debug, Deserialize)]
 pub struct AddPlayerRequest {
     pub name: String,
     pub rank: Rank,
 }
 
-/// プレイヤー更新リクエストのボディ
 #[derive(Debug, Deserialize)]
 pub struct UpdatePlayerRequest {
     pub name: String,
     pub rank: Rank,
 }
 
-/// 設定更新リクエストのボディ
 #[derive(Debug, Deserialize)]
 pub struct UpdateConfigRequest {
     pub team_count: usize,
 }
 
-/// チーム分け実行結果のレスポンス
 #[derive(Debug, Serialize)]
 pub struct BalanceResult {
-    /// 分けられたチームのリスト
     pub teams: Vec<Team>,
-    /// 重複名解決済みのプレイヤーリスト（画面側で名前を更新するために返す）
+    /// 重複名解決済みプレイヤーリスト（フロント側の名前表示更新用）
     pub players: Vec<Player>,
 }
 
 // ============================================================
-// チーム均衡化アルゴリズム
+// チーム均衡化ロジック
 // ============================================================
 
 // ───────────────────────────────────────────────────────────
-// resolve_duplicate_names - 重複した名前にサフィックスを付ける
+// resolve_duplicate_names - 重複名に連番サフィックスを付ける
 //
-// 【動作例】
-//   入力: ["あかし", "たろう", "あかし", "じろう", "たろう", "たろう"]
-//   出力: ["あかし(1)", "たろう(1)", "あかし(2)", "じろう", "たろう(2)", "たろう(3)"]
+// 例: ["あかし", "たろう", "あかし"] → ["あかし(1)", "たろう", "あかし(2)"]
 //
-// 【なぜ必要か】
-//   同じ名前のプレイヤーが複数いる場合、チーム表示で誰が誰か分からなくなる。
-//   自動的に番号を付けることで視覚的に区別できるようにする。
+// チーム分け実行時のみ呼び出す。
+// （プレイヤー登録時は元の name を保持する）
 // ───────────────────────────────────────────────────────────
 fn resolve_duplicate_names(players: &mut Vec<Player>) {
-    // まず各名前が何回出現するかカウントする
+    // 各名前の出現回数をカウント
     let mut name_count: HashMap<String, usize> = HashMap::new();
-    for player in players.iter() {
-        *name_count.entry(player.name.clone()).or_insert(0) += 1;
+    for p in players.iter() {
+        *name_count.entry(p.name.clone()).or_insert(0) += 1;
     }
 
-    // 重複する名前にインデックスを付けるためのカウンター
-    let mut name_index: HashMap<String, usize> = HashMap::new();
+    // 重複する名前にインデックスを付けるカウンター
+    let mut name_idx: HashMap<String, usize> = HashMap::new();
 
-    for player in players.iter_mut() {
-        if name_count[&player.name] > 1 {
-            // 同名プレイヤーが2人以上いる場合は (1), (2) ... を付ける
-            let idx = name_index.entry(player.name.clone()).or_insert(0);
+    for p in players.iter_mut() {
+        if name_count[&p.name] > 1 {
+            let idx = name_idx.entry(p.name.clone()).or_insert(0);
             *idx += 1;
-            player.display_name = Some(format!("{}({})", player.name, idx));
+            p.display_name = Some(format!("{}({})", p.name, idx));
         } else {
-            // 名前が一意の場合は display_name をリセット
-            player.display_name = None;
+            p.display_name = None;
         }
     }
 }
 
 // ───────────────────────────────────────────────────────────
-// balance_teams - チーム均衡化のコアアルゴリズム
+// balance_teams - 戦力均衡化チーム分けアルゴリズム
 //
-// 【アルゴリズムの概要】
-// "Greedy Number Partitioning"（貪欲法による数値分割）を応用。
+// 【アルゴリズム: Greedy Number Partitioning（貪欲法）】
+//
+// 「複数の袋に重さのある石を入れる」問題に相当する古典的アルゴリズム。
+// 最適解ではないが、実用上十分に均衡したチームが作れる。
 //
 // 手順:
-//   1. プレイヤーをスコア降順（強い順）でソートする
-//      → 強いプレイヤーから割り当てることで、チーム間の偏りを最小化する
+//   1. プレイヤーをスコア降順（強い順）でソート
+//      → プレデター(15)が最初に処理されるため、チームへの影響が大きい
+//        プレイヤーが先に各チームに分散される
 //
-//   2. 各プレイヤーを「現在の合計スコアが最も低いチーム」に追加する
-//      → 最小ヒープ的な発想。常に最も弱いチームに強いプレイヤーを補充する
+//   2. 各プレイヤーを「現在合計スコアが最小のチーム」に追加
+//      → チームのスコア差が縮まる方向に自然に振り分けられる
 //
-// 【なぜこの方法が有効か】
-//   例: プレデター(15), マスター(10), マスター(10), ゴールド(3) を2チームに分ける場合
-//
-//   Step1: プレデター(15) → チームA [15]  チームB [0]   ← Bが最低
-//   Step2: マスター(10)  → チームB [10]  チームA [15]  ← Aが最低
-//   Step3: マスター(10)  → チームA [25]  チームB [10]  ← Bが最低
-//   Step4: ゴールド(3)   → チームB [13]  チームA [25]  ← ...
-//   結果: A=25, B=13 → 差12
-//
-//   もしランダムに分けると: A=[15+10]=25, B=[10+3]=13 or A=[15+3]=18, B=[10+10]=20
-//   貪欲法は最適に近い分け方を自動で見つける
-//
-// 【パラメータ】
-//   players    - 分けるプレイヤーのリスト（このリスト自体は変更しない）
-//   team_count - 作るチームの数
-//
-// 【戻り値】
-//   Vec<Team> - 均衡化されたチームのリスト
+// 【例】プレデター+マスター+マスター+ゴールド を 2チームに分ける
+//   Step1: プレデター(15) → [チームA: 15] [チームB:  0]
+//   Step2: マスター(10)  → [チームA: 15] [チームB: 10]  ← Bが最小なので
+//   Step3: マスター(10)  → [チームA: 25] [チームB: 10]  ← Aが最小なので? いや違う
+//          実際は → [チームA: 15] [チームB: 20]  ← Aが最小なので
+//   Step4: ゴールド(3)   → [チームA: 18] [チームB: 20]
+//   結果: A=18, B=20、差=2（非常に均衡）
 // ───────────────────────────────────────────────────────────
 fn balance_teams(players: &[Player], team_count: usize) -> Vec<Team> {
-    // チーム数が0や1の場合のガード処理（異常値が来ても壊れないように）
-    let team_count = team_count.max(1);
+    // 安全弁: チーム数は最低1、最大はプレイヤー数
+    let team_count = team_count.max(1).min(players.len().max(1));
 
-    // プレイヤーが0人の場合は空のチームリストを返す
     if players.is_empty() {
         return (1..=team_count)
-            .map(|i| Team {
-                id: i,
-                players: Vec::new(),
-                total_score: 0,
-            })
+            .map(|i| Team { id: i, players: vec![], total_score: 0 })
             .collect();
     }
 
-    // ── Step 1: プレイヤーをスコア降順（強い順）でソート ──
-    // players は &[Player]（不変参照）なので、一度クローンしてから並べ替える
-    let mut sorted_players: Vec<Player> = players.to_vec();
-    sorted_players.sort_by(|a, b| {
-        // スコアで降順比較。同スコアの場合は名前でアルファベット順（安定ソート）
-        b.rank.score().cmp(&a.rank.score())
-    });
+    // ── Step 1: スコア降順でソート ──
+    let mut sorted: Vec<Player> = players.to_vec();
+    sorted.sort_by(|a, b| b.rank.score().cmp(&a.rank.score()));
 
-    // ── Step 2: チームの合計スコアと所属プレイヤーを追跡する構造を初期化 ──
-    // team_scores[i] = チーム(i+1)の現在の合計スコア
+    // ── Step 2: チームの合計スコアと所属プレイヤーを管理 ──
     let mut team_scores: Vec<u32> = vec![0; team_count];
-    // team_players[i] = チーム(i+1)に割り当てられたプレイヤーのリスト
-    let mut team_players: Vec<Vec<Player>> = vec![Vec::new(); team_count];
+    let mut team_players: Vec<Vec<Player>> = vec![vec![]; team_count];
 
-    // ── Step 3: 各プレイヤーを最もスコアが低いチームに割り当て ──
-    for player in sorted_players {
-        // 現在スコアが最も低いチームのインデックスを探す
-        // enumerate() でインデックスと値のペアにしてから min_by_key で最小を取る
-        let min_team_idx = team_scores
+    // ── Step 3: 各プレイヤーを最小スコアのチームに割り当て ──
+    for player in sorted {
+        // 最も合計スコアが低いチームのインデックスを取得
+        let min_idx = team_scores
             .iter()
             .enumerate()
-            .min_by_key(|(_, &score)| score)
-            .map(|(idx, _)| idx)
-            .unwrap_or(0); // チームが存在しない場合の安全弁（実際には起こらない）
+            .min_by_key(|(_, &s)| s)
+            .map(|(i, _)| i)
+            .unwrap_or(0);
 
-        // そのチームにプレイヤーを追加し、合計スコアを更新
-        let player_score = player.rank.score();
-        team_players[min_team_idx].push(player);
-        team_scores[min_team_idx] += player_score;
+        team_scores[min_idx] += player.rank.score();
+        team_players[min_idx].push(player);
     }
 
-    // ── Step 4: 結果を Team 構造体にまとめて返す ──
+    // ── Step 4: Team 構造体に変換して返す ──
     team_players
         .into_iter()
         .enumerate()
         .map(|(i, players)| {
             let total_score = players.iter().map(|p| p.rank.score()).sum();
-            Team {
-                id: i + 1, // チーム番号は1始まり
-                players,
-                total_score,
-            }
+            Team { id: i + 1, players, total_score }
         })
         .collect()
 }
 
 // ============================================================
-// APIハンドラー関数
-// ============================================================
-// 各関数はHTTPリクエストを受け取り、JSONレスポンスを返す。
-// State(state) でサーバーの共有状態にアクセスできる。
+// APIハンドラー関数群
+//
+// 【RwLockの使い方】
+//   読み取り: state.read().unwrap()  ← 複数スレッド同時OK
+//   書き込み: state.write().unwrap() ← 排他ロック
 // ============================================================
 
-/// GET /api/players - 全プレイヤーを返す
-async fn get_players(
-    State(state): State<Arc<Mutex<AppState>>>,
-) -> impl IntoResponse {
-    // Mutex をロックして状態にアクセス
-    // lock() が失敗するのは別スレッドがパニックした場合のみ（実用上ほぼ起きない）
-    let state = state.lock().unwrap();
-    Json(serde_json::json!({
-        "players": state.players
-    }))
+/// GET /health - ヘルスチェック（Renderが起動確認に使う）
+///
+/// このエンドポイントが 200 OK を返さないと Render はデプロイ失敗と判断する。
+/// 処理は極めてシンプル（DBアクセスなし）で素早く応答できるようにしてある。
+async fn health_check() -> impl IntoResponse {
+    (StatusCode::OK, Json(serde_json::json!({ "status": "ok" })))
 }
 
-/// POST /api/players - プレイヤーを追加する
-async fn add_player(
-    State(state): State<Arc<Mutex<AppState>>>,
-    Json(req): Json<AddPlayerRequest>, // リクエストボディをJSONから自動変換
-) -> impl IntoResponse {
-    let mut state = state.lock().unwrap();
+/// GET /api/players - 全プレイヤー取得
+async fn get_players(State(state): State<SharedState>) -> impl IntoResponse {
+    // 読み取りロック（複数スレッドが同時に取得可能）
+    let state = state.read().unwrap();
+    Json(serde_json::json!({ "players": state.players }))
+}
 
-    // 新しいプレイヤーを作成（IDはUUIDv4でランダム生成）
+/// POST /api/players - プレイヤーを新規追加
+async fn add_player(
+    State(state): State<SharedState>,
+    Json(req): Json<AddPlayerRequest>,
+) -> impl IntoResponse {
+    let mut state = state.write().unwrap(); // 書き込みロック
+
     let new_player = Player {
         id: Uuid::new_v4().to_string(),
-        name: req.name.trim().to_string(), // 前後の空白を除去
+        name: req.name.trim().to_string(),
         rank: req.rank,
         display_name: None,
     };
 
-    // 追加したプレイヤーをクローン（後でレスポンスに使うため）
     let added = new_player.clone();
     state.players.push(new_player);
+    state.teams = None; // プレイヤー変更で既存チーム結果は無効化
 
-    // チーム分け結果をリセット（プレイヤーが変わったので古い結果は無効）
-    state.teams = None;
-
-    // 201 Created ステータスと追加されたプレイヤーを返す
     (StatusCode::CREATED, Json(serde_json::json!({ "player": added })))
 }
 
-/// PUT /api/players/:id - 指定IDのプレイヤーを更新する
+/// PUT /api/players/:id - プレイヤー情報を更新
 async fn update_player(
-    State(state): State<Arc<Mutex<AppState>>>,
-    Path(id): Path<String>, // URLの :id 部分を取り出す
+    State(state): State<SharedState>,
+    Path(id): Path<String>,
     Json(req): Json<UpdatePlayerRequest>,
 ) -> impl IntoResponse {
-    let mut state = state.lock().unwrap();
+    let mut state = state.write().unwrap();
 
-    // IDでプレイヤーを検索し、見つかれば更新する
     if let Some(player) = state.players.iter_mut().find(|p| p.id == id) {
         player.name = req.name.trim().to_string();
         player.rank = req.rank;
-        player.display_name = None; // 更新時は表示名をリセット
+        player.display_name = None;
 
         let updated = player.clone();
-        state.teams = None; // チーム結果もリセット
-        return (StatusCode::OK, Json(serde_json::json!({ "player": updated })));
+        state.teams = None;
+        return (
+            StatusCode::OK,
+            Json(serde_json::json!({ "player": updated })),
+        );
     }
 
-    // 見つからなかった場合は404エラー
     (
         StatusCode::NOT_FOUND,
         Json(serde_json::json!({ "error": "プレイヤーが見つかりません" })),
     )
 }
 
-/// DELETE /api/players/:id - 指定IDのプレイヤーを削除する
+/// DELETE /api/players/:id - プレイヤーを削除
 async fn delete_player(
-    State(state): State<Arc<Mutex<AppState>>>,
+    State(state): State<SharedState>,
     Path(id): Path<String>,
 ) -> impl IntoResponse {
-    let mut state = state.lock().unwrap();
+    let mut state = state.write().unwrap();
 
-    // retain() は条件が true の要素だけ残す（falseの要素を削除するフィルタ）
-    let before_len = state.players.len();
+    let before = state.players.len();
     state.players.retain(|p| p.id != id);
-    let after_len = state.players.len();
 
-    if before_len != after_len {
-        // 実際に削除された場合
-        state.teams = None; // チーム結果をリセット
+    if state.players.len() < before {
+        state.teams = None;
         StatusCode::NO_CONTENT.into_response()
     } else {
-        // 対象IDが存在しなかった場合
         (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({ "error": "プレイヤーが見つかりません" })),
@@ -445,43 +398,35 @@ async fn delete_player(
     }
 }
 
-/// GET /api/config - 現在の設定を返す
-async fn get_config(
-    State(state): State<Arc<Mutex<AppState>>>,
-) -> impl IntoResponse {
-    let state = state.lock().unwrap();
+/// GET /api/config - 設定取得
+async fn get_config(State(state): State<SharedState>) -> impl IntoResponse {
+    let state = state.read().unwrap();
     Json(serde_json::json!({ "config": state.config }))
 }
 
-/// PUT /api/config - 設定を更新する（管理者のみが使う想定）
+/// PUT /api/config - 設定更新（チーム数変更）
 async fn update_config(
-    State(state): State<Arc<Mutex<AppState>>>,
+    State(state): State<SharedState>,
     Json(req): Json<UpdateConfigRequest>,
 ) -> impl IntoResponse {
-    let mut state = state.lock().unwrap();
+    let mut state = state.write().unwrap();
 
-    // チーム数の最小値は2、最大値はプレイヤー数（最低でも2）
-    let team_count = req.team_count.max(2);
-    state.config.team_count = team_count;
-
-    // チーム数が変わったので既存のチーム結果をリセット
+    // チーム数の最小値は 2
+    state.config.team_count = req.team_count.max(2);
     state.teams = None;
 
     Json(serde_json::json!({ "config": state.config }))
 }
 
-/// POST /api/teams/balance - チーム分けを実行する
+/// POST /api/teams/balance - チーム分けを実行する（管理者専用）
 ///
-/// これがこのアプリの核心機能。
-/// 1. 重複名を解決する
-/// 2. 均衡化アルゴリズムでチームに振り分ける
+/// このエンドポイントが本アプリの核心。
+/// 1. 重複プレイヤー名を解決
+/// 2. 均衡化アルゴリズムでチームに振り分け
 /// 3. 結果を保存してレスポンスで返す
-async fn balance_teams_handler(
-    State(state): State<Arc<Mutex<AppState>>>,
-) -> impl IntoResponse {
-    let mut state = state.lock().unwrap();
+async fn balance_teams_handler(State(state): State<SharedState>) -> impl IntoResponse {
+    let mut state = state.write().unwrap();
 
-    // プレイヤーが誰もいない場合はエラー
     if state.players.is_empty() {
         return (
             StatusCode::BAD_REQUEST,
@@ -490,42 +435,30 @@ async fn balance_teams_handler(
             .into_response();
     }
 
-    // チーム数がプレイヤー数を超えないように制限する
-    // （プレイヤー3人を4チームに分けることはできない）
+    // チーム数はプレイヤー数を超えないように制限
     let team_count = state.config.team_count.min(state.players.len());
 
-    // ── 重複名の解決 ──
-    // players のクローンを作り、そちらで display_name を更新する
-    // （元の state.players も同期して更新する）
-    let mut players_with_resolved_names = state.players.clone();
-    resolve_duplicate_names(&mut players_with_resolved_names);
+    // 重複名解決（元のプレイヤーリストも更新する）
+    let mut resolved = state.players.clone();
+    resolve_duplicate_names(&mut resolved);
 
-    // 解決した display_name を元のプレイヤーリストにも反映する
-    for resolved in &players_with_resolved_names {
-        if let Some(orig) = state.players.iter_mut().find(|p| p.id == resolved.id) {
-            orig.display_name = resolved.display_name.clone();
+    // 解決した display_name を元のリストに反映
+    for r in &resolved {
+        if let Some(orig) = state.players.iter_mut().find(|p| p.id == r.id) {
+            orig.display_name = r.display_name.clone();
         }
     }
 
-    // ── チーム均衡化の実行 ──
-    let teams = balance_teams(&players_with_resolved_names, team_count);
-
-    // 結果を状態として保存（GET /api/teams で後から取得できるように）
+    // 均衡化アルゴリズム実行
+    let teams = balance_teams(&resolved, team_count);
     state.teams = Some(teams.clone());
 
-    let result = BalanceResult {
-        teams,
-        players: players_with_resolved_names,
-    };
-
-    Json(serde_json::json!(result)).into_response()
+    Json(serde_json::json!(BalanceResult { teams, players: resolved })).into_response()
 }
 
-/// GET /api/teams - 最後に実行したチーム分け結果を返す
-async fn get_teams(
-    State(state): State<Arc<Mutex<AppState>>>,
-) -> impl IntoResponse {
-    let state = state.lock().unwrap();
+/// GET /api/teams - 最後のチーム分け結果を返す
+async fn get_teams(State(state): State<SharedState>) -> impl IntoResponse {
+    let state = state.read().unwrap();
     match &state.teams {
         Some(teams) => Json(serde_json::json!({ "teams": teams })).into_response(),
         None => (
@@ -536,42 +469,13 @@ async fn get_teams(
     }
 }
 
-/// GET /health - ヘルスチェックエンドポイント
-///
-/// Renderがサービスの起動確認に使う。
-/// 200 OK を返すだけのシンプルなエンドポイント。
-async fn health_check() -> impl IntoResponse {
-    Json(serde_json::json!({ "status": "ok" }))
-}
-
-// ============================================================
-// SPAフォールバックハンドラー
-// ============================================================
-// Vue RouterはSPA（シングルページアプリケーション）なので、
-// /owner のような存在しないサーバーサイドパスへのアクセスも
-// index.html を返す必要がある。
-// ============================================================
-async fn spa_fallback() -> impl IntoResponse {
-    // staticディレクトリのindex.htmlを読み込んで返す
-    match tokio::fs::read_to_string("static/index.html").await {
-        Ok(content) => axum::response::Html(content).into_response(),
-        Err(_) => (
-            StatusCode::NOT_FOUND,
-            "フロントエンドのビルドファイルが見つかりません。先にVueをビルドしてください。",
-        )
-            .into_response(),
-    }
-}
-
 // ============================================================
 // メイン関数 - サーバーの起動
 // ============================================================
-// #[tokio::main] マクロが main を非同期関数として実行できるようにする
-// ============================================================
 #[tokio::main]
 async fn main() {
-    // ── ログの初期化 ──
-    // RUST_LOG 環境変数でログレベルを制御できる（例: RUST_LOG=debug）
+    // ── ログ初期化 ──
+    // RUST_LOG=info（または debug）を環境変数でコントロールできる
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -579,56 +483,95 @@ async fn main() {
         )
         .init();
 
-    // ── アプリケーション状態の初期化 ──
-    // Arc<Mutex<>> でラップして複数のルートハンドラーから共有できるようにする
-    let shared_state = Arc::new(Mutex::new(AppState::default()));
-
-    // ── CORSの設定 ──
-    // 開発環境（Vite dev server）からのAPIリクエストを許可する。
-    // 本番環境ではVueとRustが同じオリジンで動作するため不要だが、
-    // 開発中の利便性のために設定しておく。
-    let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
-        .allow_headers(tower_http::cors::Any)
-        .allow_origin(Any);
-
-    // ── APIルーターの定義 ──
-    // /api プレフィックスを持つすべてのAPIエンドポイントをまとめる
-    let api_router = Router::new()
-        .route("/players",        get(get_players).post(add_player))
-        .route("/players/:id",    put(update_player).delete(delete_player))
-        .route("/config",         get(get_config).put(update_config))
-        .route("/teams",          get(get_teams))
-        .route("/teams/balance",  post(balance_teams_handler));
-
-    // ── ポート設定 ──
-    // Renderでは PORT 環境変数でポートが渡される。
-    // ローカル開発時のデフォルトは 8080。
+    // ────────────────────────────────────────────────────────
+    // ポート番号の決定
+    //
+    // 【Renderでの動作】
+    //   Renderは起動時に PORT 環境変数を自動的にセットする。
+    //   本コードはその値を読み取る。PORT が未設定の場合（ローカル開発時）は
+    //   デフォルト値 8080 を使用する。
+    //
+    // 【重要】
+    //   Renderが指定するポートは 8080 とは限らない。
+    //   ハードコードすると "Timed out" エラーの原因になる。
+    // ────────────────────────────────────────────────────────
     let port = std::env::var("PORT")
-        .unwrap_or_else(|_| "8080".to_string())
-        .parse::<u16>()
+        .ok()
+        .and_then(|p| p.parse::<u16>().ok())
         .unwrap_or(8080);
 
-    // ── メインルーターの組み立て ──
-    // 優先度: /health → /api/* → 静的ファイル → SPAフォールバック
+    // ── 共有状態の初期化 ──
+    let shared_state: SharedState = Arc::new(RwLock::new(AppState::default()));
+
+    // ── CORS設定 ──
+    // 開発中は Vite(localhost:5173) から API を呼べるように許可する
+    // 本番（Docker）では同じオリジンなので実質不要だが、開発利便性のために残す
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE])
+        .allow_headers(Any)
+        .allow_origin(Any);
+
+    // ── APIルーター ──
+    let api_router = Router::new()
+        .route("/players",       get(get_players).post(add_player))
+        .route("/players/:id",   put(update_player).delete(delete_player))
+        .route("/config",        get(get_config).put(update_config))
+        .route("/teams",         get(get_teams))
+        .route("/teams/balance", post(balance_teams_handler));
+
+    // ────────────────────────────────────────────────────────
+    // 静的ファイル配信の設定（SPA対応）
+    //
+    // ServeDir::new("static") = ./static/ ディレクトリ以下のファイルを配信
+    //
+    // .not_found_service(ServeFile::new("static/index.html"))
+    //   → 存在しないパス（/owner, /user など Vue Router のルート）へのアクセスに対し
+    //     index.html を返す。これがSPA(シングルページアプリ)の動作に必須の設定。
+    //     これがないと /owner にブラウザで直接アクセスすると 404 になる。
+    //
+    // Docker コンテナ内のディレクトリ構造:
+    //   /app/
+    //   ├── apex-team-balancer  ← Rustバイナリ（起動ディレクトリ = /app）
+    //   └── static/             ← Vueのビルド成果物
+    //       ├── index.html
+    //       └── assets/
+    //           ├── index-xxxx.js
+    //           └── index-xxxx.css
+    // ────────────────────────────────────────────────────────
+    let spa_service = ServeDir::new("static")
+        .not_found_service(ServeFile::new("static/index.html"));
+
+    // ── メインルーター組み立て ──
+    // 優先度（上から順に試みる）:
+    //   1. GET /health             → ヘルスチェック
+    //   2. /api/**                 → REST API
+    //   3. それ以外               → 静的ファイル or SPA fallback (index.html)
     let app = Router::new()
         .route("/health", get(health_check))
         .nest("/api", api_router)
-        // Vueのビルド成果物（JS/CSS/画像など）を配信
-        // Docker内では /app/static に配置される
-        .nest_service("/assets", ServeDir::new("static/assets"))
-        // その他のリクエスト（/, /owner など）はSPAのindex.htmlを返す
-        .fallback(spa_fallback)
+        // fallback_service: 上記ルートにマッチしないすべてのリクエストを処理
+        .fallback_service(spa_service)
         .layer(cors)
-        // アプリケーション状態を全ルートで共有できるように登録
         .with_state(shared_state);
 
+    // ────────────────────────────────────────────────────────
+    // サーバー起動
+    //
+    // "0.0.0.0" = すべてのネットワークインターフェースでリッスン（必須）
+    // "127.0.0.1" では Docker コンテナ外（= Render のロードバランサー）から
+    // 届かないため、必ず "0.0.0.0" を使うこと！
+    // ────────────────────────────────────────────────────────
     let addr = format!("0.0.0.0:{}", port);
-    tracing::info!("🚀 サーバー起動: http://{}", addr);
+    tracing::info!("🚀 起動完了: http://{}", addr);
+    tracing::info!("   ヘルスチェック: http://{}/health", addr);
 
-    // ── サーバーの起動 ──
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    axum::serve(listener, app).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr)
+        .await
+        .expect("ポートのバインドに失敗しました。PORT環境変数を確認してください");
+
+    axum::serve(listener, app)
+        .await
+        .expect("サーバーの起動に失敗しました");
 }
 
 // ============================================================
@@ -638,48 +581,48 @@ async fn main() {
 mod tests {
     use super::*;
 
-    // balance_teams のテスト
     #[test]
-    fn test_balance_teams_two_teams() {
-        // テスト用プレイヤーを作成
+    fn test_balance_two_teams() {
         let players = vec![
             Player { id: "1".to_string(), name: "A".to_string(), rank: Rank::Predator, display_name: None },
             Player { id: "2".to_string(), name: "B".to_string(), rank: Rank::Master,   display_name: None },
             Player { id: "3".to_string(), name: "C".to_string(), rank: Rank::Gold,     display_name: None },
             Player { id: "4".to_string(), name: "D".to_string(), rank: Rank::Bronze,   display_name: None },
         ];
-
         let teams = balance_teams(&players, 2);
 
-        // 2チームに分かれているか確認
         assert_eq!(teams.len(), 2);
-        // 全プレイヤーがどこかのチームに入っているか確認
-        let total_players: usize = teams.iter().map(|t| t.players.len()).sum();
-        assert_eq!(total_players, 4);
+        let total: usize = teams.iter().map(|t| t.players.len()).sum();
+        assert_eq!(total, 4);
 
-        // チーム1のスコアとチーム2のスコアの差が適切な範囲内か確認
-        // プレデター(15)+ゴールド(3)=18 vs マスター(10)+ブロンズ(1)=11 → 差7
-        // これが貪欲法の結果（最適解に近い）
-        let score_diff = (teams[0].total_score as i32 - teams[1].total_score as i32).abs();
-        println!("スコア差: {}", score_diff);
-        assert!(score_diff <= 15, "スコア差が大きすぎます: {}", score_diff);
+        // スコア差が合計スコアの半分以下であること
+        let diff = (teams[0].total_score as i32 - teams[1].total_score as i32).abs();
+        let total_score: u32 = teams.iter().map(|t| t.total_score).sum();
+        assert!(diff <= total_score as i32 / 2);
     }
 
-    // 重複名解決のテスト
     #[test]
-    fn test_resolve_duplicate_names() {
+    fn test_resolve_duplicates() {
         let mut players = vec![
-            Player { id: "1".to_string(), name: "あかし".to_string(), rank: Rank::Gold, display_name: None },
+            Player { id: "1".to_string(), name: "あかし".to_string(), rank: Rank::Gold,   display_name: None },
             Player { id: "2".to_string(), name: "たろう".to_string(), rank: Rank::Silver, display_name: None },
             Player { id: "3".to_string(), name: "あかし".to_string(), rank: Rank::Bronze, display_name: None },
         ];
-
         resolve_duplicate_names(&mut players);
 
-        // 重複している "あかし" に番号が付いているか
         assert_eq!(players[0].display_name, Some("あかし(1)".to_string()));
+        assert_eq!(players[1].display_name, None); // たろうは重複なし
         assert_eq!(players[2].display_name, Some("あかし(2)".to_string()));
-        // 重複していない "たろう" は変更なし
-        assert_eq!(players[1].display_name, None);
+    }
+
+    #[test]
+    fn test_rank_scores_ordered() {
+        // 各ランクのスコアが昇順になっているか確認
+        assert!(Rank::Bronze.score() < Rank::Silver.score());
+        assert!(Rank::Silver.score() < Rank::Gold.score());
+        assert!(Rank::Gold.score() < Rank::Platinum.score());
+        assert!(Rank::Platinum.score() < Rank::Diamond.score());
+        assert!(Rank::Diamond.score() < Rank::Master.score());
+        assert!(Rank::Master.score() < Rank::Predator.score());
     }
 }

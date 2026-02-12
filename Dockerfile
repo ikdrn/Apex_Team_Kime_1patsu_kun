@@ -1,114 +1,149 @@
 # ============================================================
-# Dockerfile - チーム決め一発くん マルチステージビルド定義
-#
-# 【マルチステージビルドとは】
-# 1つのDockerfileで複数のビルドフェーズを定義する技術。
-# 最終イメージにはビルドツール（Node.js, Rustコンパイラ等）を
-# 含めないため、デプロイイメージを軽量に保てる。
+# Dockerfile - チーム決め一発くん マルチステージビルド（修正版 v2）
 #
 # 【ビルドの流れ】
-# Stage 1 (frontend-builder) : Vue.js をビルドして dist/ を生成
-# Stage 2 (backend-builder)  : Rust をビルドして実行ファイルを生成
-# Stage 3 (runtime)          : 実行ファイル + dist/ だけを持つ軽量イメージ
+# Stage 1 (frontend-builder) : Node.js で Vue.js をビルド → dist/ を生成
+# Stage 2 (backend-builder)  : Rust で バイナリをビルド
+# Stage 3 (runtime)          : Alpine に バイナリ + dist/ だけを入れた軽量イメージ
+#
+# 【Renderデプロイ時の重要注意事項】
+#   - Renderは起動時に PORT 環境変数を自動セットする
+#   - RustコードはこのPORT変数を読み取ってリッスンする
+#   - EXPOSE はドキュメント的な意味しかなくポートを固定しない
 # ============================================================
 
 
 # ──────────────────────────────────────────────────────────────
 # Stage 1: フロントエンド（Vue.js）のビルド
-# Node.js 20 Alpine（Alpine = 軽量Linuxディストリビューション）を使用
 # ──────────────────────────────────────────────────────────────
 FROM node:20-alpine AS frontend-builder
 
-# 作業ディレクトリを設定
-# 以降の COPY, RUN コマンドはこのディレクトリ内で実行される
 WORKDIR /app/frontend
 
-# ── 依存関係のインストール ──
-# package.json と package-lock.json を先にコピーしてから npm ci を実行する。
-# こうすることで、ソースコードが変わっても依存関係が変わらない限り
-# Docker のキャッシュが使われ、ビルド時間が短縮される。
+# ── 依存関係だけ先にインストール（Docker キャッシュ活用）──
+# package*.json = package.json と package-lock.json の両方にマッチ
+# ソースコードが変わっても package.json が変わらなければこの層はキャッシュされる
 COPY frontend/package*.json ./
 RUN npm ci --silent
 
-# ── ソースコードをコピーしてビルド ──
-# npm run build → vite build を実行し dist/ ディレクトリにバンドルを出力する
+# ── Vueアプリのビルド ──
 COPY frontend/ .
 RUN npm run build
+# ビルド後は dist/ ディレクトリに HTML/JS/CSS が生成される
 
 
 # ──────────────────────────────────────────────────────────────
 # Stage 2: バックエンド（Rust）のビルド
-# rust:1.81-alpine を使用（Alpine で musl コンパイルにより静的リンク）
+#
+# rust:1.81-alpine を使用する理由:
+#   Alpine は musl libc を使うため、ビルドされたバイナリは
+#   glibc に依存しない（= 軽量な Alpine の runtime でも動く）
 # ──────────────────────────────────────────────────────────────
 FROM rust:1.81-alpine AS backend-builder
 
-# musl-dev: musl libc のヘッダーファイル（Alpine でのコンパイルに必要）
-# pkgconfig, openssl-dev: 一部クレートが SSL を必要とする場合に備えて
-RUN apk add --no-cache musl-dev pkgconfig openssl-dev openssl-libs-static
+# musl-dev: Alpine で C コードのコンパイルに必要なヘッダーファイル
+# Rust クレートの一部（ring, hyper など）は C ライブラリを内部で使うため必要
+RUN apk add --no-cache musl-dev
 
 WORKDIR /app
 
-# ── 依存関係のキャッシュ最適化（重要なテクニック）──
-# まず Cargo.toml と Cargo.lock だけをコピーし、
-# ダミーの main.rs でビルドを実行する。
-# こうすると、ソースコードのみが変わった場合に依存クレートの
-# ダウンロード・コンパイルをスキップできる（大幅な時間短縮）。
-COPY backend/Cargo.toml backend/Cargo.lock ./
-RUN mkdir src && \
-    echo 'fn main() { println!("dummy"); }' > src/main.rs && \
-    cargo build --release 2>&1 && \
-    # ダミービルドの成果物を削除（実際のビルドと競合しないように）
-    rm -f target/release/deps/apex_team_balancer* && \
-    rm src/main.rs
+# ────────────────────────────────────────────────────────────
+# 【Dockerキャッシュ最適化テクニック】
+#
+# Cargo.toml だけ先にコピーし、ダミーの main.rs でビルドを実行する。
+# こうすると:
+#   - 依存クレートのダウンロード＆コンパイルはこのレイヤーに閉じ込められる
+#   - 次回以降、Cargo.toml が変わらなければこのレイヤーはキャッシュから使われる
+#   - ソースコード(src/)だけ変わった場合、依存のコンパイルをスキップできる
+#
+# 【注意】
+#   Cargo.lock はコミットされていない場合があるため
+#   Cargo.toml のみをコピーする（cargo が自動で Cargo.lock を生成する）
+# ────────────────────────────────────────────────────────────
+COPY backend/Cargo.toml ./
 
-# ── 実際のソースコードでビルド ──
+# ダミービルドで依存クレートをコンパイル＆キャッシュ
+RUN mkdir -p src && \
+    echo 'fn main() { println!("placeholder"); }' > src/main.rs && \
+    cargo build --release && \
+    # ダミービルドの成果物を削除する
+    # （Rustはファイル変更日時でリビルド判定するため、古い成果物を消す必要がある）
+    # apex-team-balancer の hyphens は deps では underscores になる
+    rm -f target/release/deps/apex_team_balancer* && \
+    rm -f target/release/apex-team-balancer && \
+    rm -rf src
+
+# ── 実際のソースコードをコピーしてビルド ──
 COPY backend/src ./src
 RUN cargo build --release
 
+# バイナリが正しく生成されたか確認（デバッグ用: ビルドログに表示される）
+RUN ls -lh target/release/apex-team-balancer
+
 
 # ──────────────────────────────────────────────────────────────
-# Stage 3: 実行環境（最小限の軽量イメージ）
-# Alpine Linux のみ（Rustコンパイラも Node.js も含まない）
+# Stage 3: 本番実行環境（最小構成）
+#
+# Alpine Linux のみ。Rustコンパイラも Node.js も含まない。
+# これにより最終イメージを数MB〜十数MBに抑えられる。
 # ──────────────────────────────────────────────────────────────
 FROM alpine:3.20 AS runtime
 
-# ── セキュリティのためのランタイム依存関係 ──
-# ca-certificates: HTTPS通信の証明書検証に必要
-# libgcc: Rustの実行ファイルが動的リンクする基本ライブラリ
-RUN apk add --no-cache ca-certificates libgcc
+# ca-certificates: HTTPS通信での証明書検証に必要
+# （外部APIを呼ぶ場合や、Render のヘルスチェック通信に必要）
+RUN apk add --no-cache ca-certificates
 
-# 非rootユーザーで実行（セキュリティのベストプラクティス）
+# ── セキュリティ: 非rootユーザーで実行 ──
+# root で実行すると脆弱性悪用時のリスクが高まるため、専用ユーザーを作る
 RUN addgroup -g 1001 -S appgroup && \
     adduser -u 1001 -S appuser -G appgroup
 
+# 作業ディレクトリ = バイナリの起動ディレクトリ
+# Rust コードの ServeDir::new("static") は
+# このディレクトリを起点とした相対パスになる
 WORKDIR /app
 
-# ── ビルド成果物をコピー ──
-# Rustの実行ファイル（Stage 2 から）
-COPY --from=backend-builder /app/target/release/apex-team-balancer ./apex-team-balancer
+# ── ビルド成果物のコピー ──
 
-# Vueのビルド成果物（Stage 1 から）
-# Rustサーバーが ./static ディレクトリを静的ファイルルートとして使用する
-COPY --from=frontend-builder /app/frontend/dist ./static
+# [1] Rustバイナリ（Stage 2 から）
+COPY --from=backend-builder \
+    /app/target/release/apex-team-balancer \
+    ./apex-team-balancer
 
-# 実行ファイルに実行権限を付与
+# [2] Vueのビルド成果物（Stage 1 から）
+#     dist/ を static/ にコピーする。
+#     Rustコードは ServeDir::new("static") でここを参照している。
+COPY --from=frontend-builder \
+    /app/frontend/dist \
+    ./static
+
+# 実行権限の付与
 RUN chmod +x ./apex-team-balancer
 
-# ファイルの所有者を非rootユーザーに変更
+# ファイルオーナーを非rootユーザーに変更
 RUN chown -R appuser:appgroup /app
 
 # 非rootユーザーに切り替え
 USER appuser
 
-# ── ポートの公開 ──
-# Renderは PORT 環境変数でポートを指定する（デフォルト: 8080）
+# ────────────────────────────────────────────────────────────
+# EXPOSE について
+#
+# EXPOSE はドキュメントとしての宣言で、実際のポート開放は行わない。
+# Render は PORT 環境変数でポートを動的に割り当てるため、
+# 固定ポートは記載しない。Rustコードが $PORT を読み取って適切にバインドする。
+# ────────────────────────────────────────────────────────────
 EXPOSE 8080
 
-# ── ヘルスチェック ──
-# Dockerがコンテナの健全性を定期的に確認する設定
-# /health エンドポイントが200を返せば「健全」と判断
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD wget -qO- http://localhost:${PORT:-8080}/health || exit 1
+# ────────────────────────────────────────────────────────────
+# ヘルスチェック
+#
+# Render の外部ヘルスチェック（render.yaml の healthCheckPath）とは別に、
+# Dockerレベルでもコンテナの健全性を監視する。
+# start-period=60s: 起動直後の猶予期間（Rustアプリの起動待ち）
+# ────────────────────────────────────────────────────────────
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD wget -qO- "http://localhost:${PORT:-8080}/health" > /dev/null || exit 1
 
 # ── 起動コマンド ──
 CMD ["./apex-team-balancer"]
