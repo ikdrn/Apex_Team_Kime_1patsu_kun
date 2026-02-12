@@ -108,7 +108,7 @@ function getScoreBarWidth(score: number): string {
           <!-- スコアバー -->
           <div class="mt-3">
             <div class="flex items-center justify-between text-xs text-neutral-500 mb-1">
-              <span>戦力スコア</span>
+              <span>戦闘力</span>
               <span
                 class="font-semibold tabular-nums"
                 :class="getTeamColor(team.id).text"
@@ -166,7 +166,7 @@ function getScoreBarWidth(score: number): string {
     <!-- ── 全チームのスコア比較バー ── -->
     <div class="mt-6 p-4 bg-neutral-50 border border-neutral-200">
       <p class="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">
-        戦力バランス比較
+        戦闘力バランス比較
       </p>
       <div class="space-y-2.5">
         <div

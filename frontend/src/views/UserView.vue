@@ -44,9 +44,6 @@ function onRegistered() {
           <h1 class="text-xl font-bold tracking-tight text-neutral-900">
             チーム決め<span class="text-accent-600">一発</span>くん
           </h1>
-          <p class="text-xs text-neutral-400 mt-0.5">
-            Apex Legends Team Balancer
-          </p>
         </div>
 
         <!-- 参加者数バッジ -->
@@ -169,7 +166,7 @@ function onRegistered() {
     <footer class="mt-16 py-6 border-t border-neutral-200">
       <div class="max-w-5xl mx-auto px-4 sm:px-6 text-center">
         <p class="text-xs text-neutral-300">
-          Apex Legends Team Balancer — チーム決め一発くん
+          チーム決め一発くん
         </p>
       </div>
     </footer>

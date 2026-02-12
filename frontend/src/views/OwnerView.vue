@@ -5,18 +5,15 @@
   管理者（オーナー）が全プレイヤーを管理し、チーム分けを実行する画面。
 
   【管理者ができること】
-  1. 全プレイヤーの追加・編集・削除
-  2. チーム数の変更（2〜6チーム）
-  3. チーム分けの実行（均衡化アルゴリズム発動）
-  4. チーム分け結果の確認
-
-  【セキュリティについて】
-  /owner というURLにアクセスするだけで管理者になれる「簡易認証」方式。
-  本格的なパスワード認証は実装していないが、URLを知っている人だけが使える。
-  本番運用では HTTPS + Basic認証などを追加することを推奨。
+  1. 自分を参加者として追加（1回のみ）
+  2. 他のプレイヤーの追加・編集・削除
+  3. 各プレイヤーの戦闘力補正（±5まで）
+  4. チーム数の変更（2〜6チーム）
+  5. チーム分けの実行（均衡化アルゴリズム発動）
+  6. チームの解散
 -->
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { usePlayersStore } from '@/stores/players'
 import PlayerForm from '@/components/PlayerForm.vue'
 import PlayerList from '@/components/PlayerList.vue'
@@ -27,8 +24,14 @@ const store = usePlayersStore()
 // チーム分け実行中のローディング状態
 const isBalancing = ref(false)
 
-// 「プレイヤー追加」フォームの表示/非表示
-const showAddForm = ref(false)
+// 「自分を追加」フォームの表示/非表示
+const showSelfAddForm = ref(false)
+
+// 「他人を追加」フォームの表示/非表示
+const showOtherAddForm = ref(false)
+
+// 自分が既に追加済みかどうか
+const selfAdded = computed(() => store.myPlayerId !== null)
 
 // チーム分けを実行する
 async function handleBalance() {
@@ -49,10 +52,26 @@ async function handleBalance() {
   }
 }
 
+// チームを解散する
+async function handleDisband() {
+  if (!confirm('チームを解散しますか？チーム分け結果がリセットされます。')) return
+  await store.disbandTeams()
+}
+
 // チーム数変更ハンドラー
 async function handleTeamCountChange(e: Event) {
   const count = parseInt((e.target as HTMLSelectElement).value)
   await store.updateConfig(count)
+}
+
+// 「自分を追加」完了時
+function onSelfAddDone() {
+  showSelfAddForm.value = false
+}
+
+// 「他人を追加」完了時
+function onOtherAddDone() {
+  showOtherAddForm.value = false
 }
 </script>
 
@@ -74,9 +93,6 @@ async function handleTeamCountChange(e: Event) {
                 OWNER
               </span>
             </div>
-            <p class="text-xs text-neutral-400 mt-0.5">
-              管理者コンソール — Apex Legends Team Balancer
-            </p>
           </div>
 
           <!-- 統計サマリー -->
@@ -120,16 +136,39 @@ async function handleTeamCountChange(e: Event) {
         <!-- 区切り線 -->
         <div class="hidden sm:block w-px h-6 bg-neutral-200"></div>
 
-        <!-- プレイヤー追加ボタン -->
+        <!-- 自分を追加ボタン（登録済みなら非活性） -->
         <button
-          @click="showAddForm = !showAddForm"
+          @click="showSelfAddForm = !showSelfAddForm; showOtherAddForm = false"
+          class="btn-secondary text-xs py-1.5 px-3"
+          :disabled="selfAdded"
+          :class="{ 'opacity-40 cursor-not-allowed': selfAdded }"
+          :title="selfAdded ? '自分は既に追加済みです' : ''"
+        >
+          {{ showSelfAddForm ? '▲ 閉じる' : '自分を追加' }}
+          <span v-if="selfAdded" class="ml-1 text-emerald-600">✓</span>
+        </button>
+
+        <!-- 他人を追加ボタン -->
+        <button
+          @click="showOtherAddForm = !showOtherAddForm; showSelfAddForm = false"
           class="btn-secondary text-xs py-1.5 px-3"
         >
-          {{ showAddForm ? '▲ フォームを閉じる' : '＋ プレイヤーを追加' }}
+          {{ showOtherAddForm ? '▲ 閉じる' : '他人を追加' }}
         </button>
 
         <!-- スペーサー -->
         <div class="flex-1"></div>
+
+        <!-- チーム解散ボタン（チーム分け済みの場合のみ表示） -->
+        <button
+          v-if="store.hasTeams"
+          @click="handleDisband"
+          :disabled="store.isLoading"
+          class="text-xs py-1.5 px-3 border border-neutral-300 text-neutral-600
+                 hover:bg-neutral-100 transition-colors"
+        >
+          チーム解散
+        </button>
 
         <!-- チーム分け実行ボタン（最も目立つ位置に配置） -->
         <button
@@ -152,7 +191,7 @@ async function handleTeamCountChange(e: Event) {
 
       </div>
 
-      <!-- ── プレイヤー追加フォーム（展開/折りたたみ） ── -->
+      <!-- ── 自分を追加フォーム ── -->
       <Transition
         enter-active-class="transition-all duration-200 ease-out overflow-hidden"
         enter-from-class="opacity-0 max-h-0"
@@ -162,15 +201,40 @@ async function handleTeamCountChange(e: Event) {
         leave-to-class="opacity-0 max-h-0"
       >
         <div
-          v-if="showAddForm"
+          v-if="showSelfAddForm"
+          class="border-t border-neutral-100 bg-neutral-50 px-4 sm:px-6 py-4"
+        >
+          <div class="max-w-md">
+            <p class="text-xs text-neutral-500 mb-3">自分の名前とランクを登録します。登録後は非活性になります。</p>
+            <PlayerForm
+              :isOwner="false"
+              :editTarget="null"
+              @done="onSelfAddDone"
+              @cancel="() => { showSelfAddForm = false }"
+            />
+          </div>
+        </div>
+      </Transition>
+
+      <!-- ── 他人を追加フォーム ── -->
+      <Transition
+        enter-active-class="transition-all duration-200 ease-out overflow-hidden"
+        enter-from-class="opacity-0 max-h-0"
+        enter-to-class="opacity-100 max-h-96"
+        leave-active-class="transition-all duration-150 ease-in overflow-hidden"
+        leave-from-class="opacity-100 max-h-96"
+        leave-to-class="opacity-0 max-h-0"
+      >
+        <div
+          v-if="showOtherAddForm"
           class="border-t border-neutral-100 bg-neutral-50 px-4 sm:px-6 py-4"
         >
           <div class="max-w-md">
             <PlayerForm
               :isOwner="true"
               :editTarget="null"
-              @done="() => { showAddForm = false }"
-              @cancel="() => { showAddForm = false }"
+              @done="onOtherAddDone"
+              @cancel="() => { showOtherAddForm = false }"
             />
           </div>
         </div>
@@ -216,7 +280,7 @@ async function handleTeamCountChange(e: Event) {
               </p>
               <p class="text-xs text-primary-600 mt-1">
                 上の「チーム分けを実行」ボタンを押すと、
-                戦力均衡化アルゴリズムで {{ store.config.team_count }}チームに分けます。
+                戦闘力均衡化アルゴリズムで {{ store.config.team_count }}チームに分けます。
               </p>
             </div>
 

@@ -3,7 +3,7 @@
 
   【役割】
   登録されているプレイヤーの一覧を表示する。
-  管理者モードでは編集・削除ボタンが表示される。
+  管理者モードでは編集・削除ボタンと戦闘力補正ボタンが表示される。
   一般ユーザーは自分のエントリだけ編集できる。
 
   【Props】
@@ -11,7 +11,7 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue'
-import { RANK_COLORS, RANK_LIST, getDisplayName } from '@/types'
+import { RANK_COLORS, RANK_LIST, RANK_SCORES, getDisplayName } from '@/types'
 import type { Player, RankName } from '@/types'
 import { usePlayersStore } from '@/stores/players'
 
@@ -62,6 +62,18 @@ function canEdit(player: Player): boolean {
   if (props.isOwner) return true
   return player.id === store.myPlayerId
 }
+
+// 実効スコア（ランクスコア + 補正値）を計算する
+function effectiveScore(player: Player): number {
+  return Math.max(1, RANK_SCORES[player.rank] + (player.score_offset ?? 0))
+}
+
+// 補正値の表示テキスト
+function offsetLabel(player: Player): string {
+  const offset = player.score_offset ?? 0
+  if (offset === 0) return ''
+  return offset > 0 ? `+${offset}` : `${offset}`
+}
 </script>
 
 <template>
@@ -87,9 +99,6 @@ function canEdit(player: Player): boolean {
     </div>
 
     <!-- ── プレイヤーリスト ── -->
-    <!--
-      TransitionGroup: v-for リストにアニメーションを付ける
-    -->
     <TransitionGroup
       tag="ul"
       enter-active-class="transition-all duration-250 ease-out"
@@ -107,7 +116,7 @@ function canEdit(player: Player): boolean {
         }"
       >
         <!-- ── 通常表示行 ── -->
-        <div class="flex items-center px-3 py-2.5 gap-2.5">
+        <div class="flex items-center px-3 py-2.5 gap-2">
           <!-- ランクバッジ -->
           <span
             class="shrink-0 inline-flex items-center px-1.5 py-0.5 text-xs font-semibold border"
@@ -130,6 +139,43 @@ function canEdit(player: Player): boolean {
               (あなた)
             </span>
           </span>
+
+          <!-- 戦闘力補正ボタン（管理者のみ） -->
+          <div v-if="isOwner" class="flex items-center gap-1 shrink-0">
+            <!-- 戦闘力スコア表示 -->
+            <span class="text-xs tabular-nums text-neutral-500 w-10 text-right">
+              <span class="font-semibold text-neutral-700">{{ effectiveScore(player) }}</span>
+              <span
+                v-if="(player.score_offset ?? 0) !== 0"
+                class="ml-0.5"
+                :class="(player.score_offset ?? 0) > 0 ? 'text-blue-500' : 'text-red-500'"
+              >
+                {{ offsetLabel(player) }}
+              </span>
+            </span>
+            <!-- − ボタン -->
+            <button
+              @click="store.adjustScoreOffset(player.id, -1)"
+              class="w-6 h-6 flex items-center justify-center border border-neutral-200
+                     text-neutral-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600
+                     transition-colors text-sm leading-none"
+              :disabled="(player.score_offset ?? 0) <= -5"
+              title="戦闘力を-1"
+            >
+              −
+            </button>
+            <!-- + ボタン -->
+            <button
+              @click="store.adjustScoreOffset(player.id, 1)"
+              class="w-6 h-6 flex items-center justify-center border border-neutral-200
+                     text-neutral-500 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600
+                     transition-colors text-sm leading-none"
+              :disabled="(player.score_offset ?? 0) >= 5"
+              title="戦闘力を+1"
+            >
+              ＋
+            </button>
+          </div>
 
           <!-- 操作ボタン（権限がある場合のみ） -->
           <div v-if="canEdit(player)" class="flex gap-1 shrink-0">

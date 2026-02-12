@@ -11,7 +11,7 @@
 // - チーム分け結果
 // - アプリ設定（チーム数）
 // - ローディング・エラー状態
-// - 自分のプレイヤーID（ローカルストレージに保存）
+// - 自分のプレイヤーID（セッション中のみ保持・localStorage不使用）
 // ============================================================
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
@@ -56,13 +56,10 @@ export const usePlayersStore = defineStore('players', () => {
   const errorMessage = ref<string | null>(null)
 
   /**
-   * 自分のプレイヤーID（LocalStorageから復元）
-   * 一般ユーザーが「自分の」エントリを識別するために使用。
-   * ページをリロードしても自分のプレイヤーが分かるように localStorage に保存する。
+   * 自分のプレイヤーID（セッション中のみ保持）
+   * ページをリロードするとリセットされる（localStorage不使用）
    */
-  const myPlayerId = ref<string | null>(
-    localStorage.getItem('apex-team-balancer-my-player-id')
-  )
+  const myPlayerId = ref<string | null>(null)
 
   // ══════════════════════════════════════════════════════════
   // Getters（算出プロパティ）
@@ -112,7 +109,6 @@ export const usePlayersStore = defineStore('players', () => {
       setError('プレイヤー一覧の取得に失敗しました')
       console.error('[fetchPlayers]', e)
     } finally {
-      // finally ブロックは成功・失敗に関わらず必ず実行される
       isLoading.value = false
     }
   }
@@ -170,8 +166,6 @@ export const usePlayersStore = defineStore('players', () => {
       // 一般ユーザーが自分のプレイヤーとして登録する場合
       if (saveAsMyPlayer) {
         myPlayerId.value = newPlayer.id
-        // localStorageに保存（ページリロード後も自分のIDを覚えている）
-        localStorage.setItem('apex-team-balancer-my-player-id', newPlayer.id)
       }
 
       // チーム分け結果をリセット（プレイヤーが変わったため）
@@ -228,10 +222,9 @@ export const usePlayersStore = defineStore('players', () => {
       // ローカルリストから削除
       players.value = players.value.filter(p => p.id !== id)
 
-      // 削除したプレイヤーが「自分」だった場合、localStorage もクリア
+      // 削除したプレイヤーが「自分」だった場合、IDをクリア
       if (myPlayerId.value === id) {
         myPlayerId.value = null
-        localStorage.removeItem('apex-team-balancer-my-player-id')
       }
 
       teams.value = null
@@ -242,6 +235,30 @@ export const usePlayersStore = defineStore('players', () => {
       return false
     } finally {
       isLoading.value = false
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // adjustScoreOffset - プレイヤーのスコア補正値を±1調整する（管理者のみ使用）
+  //
+  // バックエンドでは −5〜+5 にクランプされる
+  // ─────────────────────────────────────────────────────────
+  async function adjustScoreOffset(id: string, delta: number): Promise<boolean> {
+    try {
+      const res = await api.patch<{ player: Player }>(`/players/${id}/offset`, { delta })
+      const updated = res.data.player
+
+      const idx = players.value.findIndex(p => p.id === id)
+      if (idx !== -1) {
+        players.value[idx] = updated
+      }
+
+      teams.value = null
+      return true
+    } catch (e: any) {
+      setError(e.response?.data?.error ?? 'スコア補正の変更に失敗しました')
+      console.error('[adjustScoreOffset]', e)
+      return false
     }
   }
 
@@ -281,7 +298,6 @@ export const usePlayersStore = defineStore('players', () => {
       teams.value = result.teams
 
       // バックエンドが重複名を解決した結果でプレイヤーリストを更新
-      // これにより画面上の名前表示も "あかし(1)", "あかし(2)" に更新される
       players.value = result.players
 
       return true
@@ -291,6 +307,22 @@ export const usePlayersStore = defineStore('players', () => {
       return false
     } finally {
       isLoading.value = false
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // disbandTeams - チームを解散する（管理者のみ使用）
+  // ─────────────────────────────────────────────────────────
+  async function disbandTeams(): Promise<boolean> {
+    try {
+      clearError()
+      await api.delete('/teams')
+      teams.value = null
+      return true
+    } catch (e: any) {
+      setError(e.response?.data?.error ?? 'チームの解散に失敗しました')
+      console.error('[disbandTeams]', e)
+      return false
     }
   }
 
@@ -328,8 +360,10 @@ export const usePlayersStore = defineStore('players', () => {
     addPlayer,
     updatePlayer,
     deletePlayer,
+    adjustScoreOffset,
     updateConfig,
     balanceTeams,
+    disbandTeams,
     clearError,
   }
 })
