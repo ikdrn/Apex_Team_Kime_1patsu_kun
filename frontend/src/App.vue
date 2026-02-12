@@ -7,16 +7,35 @@
   - アプリ起動時のデータ初期化
 -->
 <script setup lang="ts">
-// onMounted: コンポーネントがDOMにマウントされた後に実行されるライフサイクルフック
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { RouterView } from 'vue-router'
 import { usePlayersStore } from '@/stores/players'
 
 const store = usePlayersStore()
 
-// アプリ起動時にサーバーからデータを読み込む
+// ポーリングタイマーID
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+// アプリ起動時にサーバーからデータを読み込み、3秒ごとに自動更新する
 onMounted(async () => {
   await store.initialize()
+
+  // 3秒ごとにプレイヤーリストとチーム結果をバックグラウンド更新
+  // （ユーザーが操作中でもリアルタイムに反映させるため）
+  pollTimer = setInterval(async () => {
+    // ローディング中・エラー表示中は更新を一時停止して UX を乱さない
+    if (store.isLoading) return
+    await Promise.all([
+      store.fetchPlayers(),
+      store.fetchTeams(),
+    ])
+  }, 3000)
+})
+
+onUnmounted(() => {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer)
+  }
 })
 </script>
 

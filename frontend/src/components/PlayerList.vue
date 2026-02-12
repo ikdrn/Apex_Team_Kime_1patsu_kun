@@ -1,13 +1,8 @@
 <!--
   PlayerList.vue - プレイヤー一覧表示コンポーネント
 
-  【役割】
-  登録されているプレイヤーの一覧を表示する。
-  管理者モードでは編集・削除ボタンと戦闘力補正ボタンが表示される。
-  一般ユーザーは自分のエントリだけ編集できる。
-
-  【Props】
-  - isOwner: 管理者モードかどうか（true=全員操作可能）
+  管理者モードでは2行レイアウト（名前行 + コントロール行）を使用し、
+  名前が表示されなくなるレイアウト崩れを防ぐ。
 -->
 <script setup lang="ts">
 import { ref } from 'vue'
@@ -21,54 +16,41 @@ const props = defineProps<{
 
 const store = usePlayersStore()
 
-// 編集中のプレイヤーIDを追跡（nullは編集していない状態）
 const editingId = ref<string | null>(null)
-
-// 編集フォームの入力値
 const editName = ref('')
 const editRank = ref<RankName>('ゴールド')
 
-// 編集の開始（インラインフォームを展開する）
 function startEdit(player: Player) {
   editingId.value = player.id
   editName.value = player.name
   editRank.value = player.rank as RankName
 }
 
-// 編集のキャンセル
 function cancelEdit() {
   editingId.value = null
 }
 
-// 編集の保存
 async function saveEdit() {
   if (!editingId.value || !editName.value.trim()) return
   const success = await store.updatePlayer(editingId.value, editName.value.trim(), editRank.value)
-  if (success) {
-    editingId.value = null
-  }
+  if (success) editingId.value = null
 }
 
-// 削除（確認ダイアログあり）
 async function handleDelete(player: Player) {
   const displayName = getDisplayName(player)
   if (!confirm(`「${displayName}」を参加者リストから削除しますか？`)) return
   await store.deletePlayer(player.id)
 }
 
-// このプレイヤーが操作可能かどうかを判定する
-// 管理者は全員、一般ユーザーは自分のエントリのみ
 function canEdit(player: Player): boolean {
   if (props.isOwner) return true
   return player.id === store.myPlayerId
 }
 
-// 実効スコア（ランクスコア + 補正値）を計算する
 function effectiveScore(player: Player): number {
   return Math.max(1, RANK_SCORES[player.rank] + (player.score_offset ?? 0))
 }
 
-// 補正値の表示テキスト
 function offsetLabel(player: Player): string {
   const offset = player.score_offset ?? 0
   if (offset === 0) return ''
@@ -78,7 +60,7 @@ function offsetLabel(player: Player): string {
 
 <template>
   <div>
-    <!-- ── セクションヘッダー ── -->
+    <!-- セクションヘッダー -->
     <div class="flex items-baseline justify-between mb-2">
       <p class="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
         参加者一覧
@@ -89,16 +71,12 @@ function offsetLabel(player: Player): string {
     </div>
     <div class="border-b border-neutral-200 mb-4"></div>
 
-    <!-- ── プレイヤーが0人の場合のエンプティステート ── -->
-    <div
-      v-if="store.players.length === 0"
-      class="py-10 text-center"
-    >
+    <!-- エンプティステート -->
+    <div v-if="store.players.length === 0" class="py-10 text-center">
       <div class="text-3xl font-black text-neutral-200 mb-2">0</div>
       <p class="text-sm text-neutral-400">参加者がいません</p>
     </div>
 
-    <!-- ── プレイヤーリスト ── -->
     <TransitionGroup
       tag="ul"
       enter-active-class="transition-all duration-250 ease-out"
@@ -111,13 +89,85 @@ function offsetLabel(player: Player): string {
         v-for="player in store.players"
         :key="player.id"
         class="border border-neutral-200 bg-white overflow-hidden"
-        :class="{
-          'border-l-4 border-l-primary-600': player.id === store.myPlayerId,
-        }"
+        :class="{ 'border-l-4 border-l-primary-600': player.id === store.myPlayerId }"
       >
-        <!-- ── 通常表示行 ── -->
-        <div class="flex items-center px-3 py-2.5 gap-2">
-          <!-- ランクバッジ -->
+        <!-- ══ 管理者向け 2行レイアウト ══ -->
+        <div v-if="isOwner" class="px-3 pt-2.5 pb-2">
+          <!-- 行1: ランクバッジ + プレイヤー名 -->
+          <div class="flex items-center gap-2 mb-1.5">
+            <span
+              class="shrink-0 inline-flex items-center px-1.5 py-0.5 text-xs font-semibold border"
+              :class="[
+                RANK_COLORS[player.rank].bg,
+                RANK_COLORS[player.rank].text,
+                RANK_COLORS[player.rank].border,
+              ]"
+            >
+              {{ player.rank }}
+            </span>
+            <span class="text-sm font-medium text-neutral-800 truncate">
+              {{ getDisplayName(player) }}
+              <span v-if="player.id === store.myPlayerId" class="ml-1 text-xs text-primary-600 font-normal">
+                (あなた)
+              </span>
+            </span>
+          </div>
+
+          <!-- 行2: 戦闘力補正 + 編集/削除ボタン -->
+          <div class="flex items-center justify-between gap-2">
+            <!-- 戦闘力補正コントロール -->
+            <div class="flex items-center gap-1">
+              <!-- − ボタン -->
+              <button
+                @click="store.adjustScoreOffset(player.id, -1)"
+                class="w-6 h-6 flex items-center justify-center border border-neutral-200
+                       text-neutral-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600
+                       transition-colors text-sm leading-none disabled:opacity-30 disabled:cursor-not-allowed"
+                :disabled="(player.score_offset ?? 0) <= -5"
+                title="戦闘力を-1"
+              >−</button>
+
+              <!-- スコア表示 -->
+              <span class="text-xs tabular-nums text-center w-12">
+                <span class="font-semibold text-neutral-800">戦闘力 {{ effectiveScore(player) }}</span>
+                <span
+                  v-if="(player.score_offset ?? 0) !== 0"
+                  class="ml-0.5"
+                  :class="(player.score_offset ?? 0) > 0 ? 'text-blue-500' : 'text-red-400'"
+                >({{ offsetLabel(player) }})</span>
+              </span>
+
+              <!-- + ボタン -->
+              <button
+                @click="store.adjustScoreOffset(player.id, 1)"
+                class="w-6 h-6 flex items-center justify-center border border-neutral-200
+                       text-neutral-500 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600
+                       transition-colors text-sm leading-none disabled:opacity-30 disabled:cursor-not-allowed"
+                :disabled="(player.score_offset ?? 0) >= 5"
+                title="戦闘力を+1"
+              >＋</button>
+            </div>
+
+            <!-- 編集/削除ボタン -->
+            <div class="flex gap-1">
+              <button
+                @click="startEdit(player)"
+                class="text-xs px-2 py-1 border border-neutral-200 text-neutral-600
+                       hover:bg-neutral-50 transition-colors"
+                :disabled="store.isLoading"
+              >編集</button>
+              <button
+                @click="handleDelete(player)"
+                class="text-xs px-2 py-1 border border-red-200 text-red-600
+                       hover:bg-red-50 transition-colors"
+                :disabled="store.isLoading"
+              >削除</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ══ 一般ユーザー向け 1行レイアウト ══ -->
+        <div v-else class="flex items-center px-3 py-2.5 gap-2.5">
           <span
             class="shrink-0 inline-flex items-center px-1.5 py-0.5 text-xs font-semibold border"
             :class="[
@@ -128,74 +178,19 @@ function offsetLabel(player: Player): string {
           >
             {{ player.rank }}
           </span>
-
-          <!-- プレイヤー名 -->
           <span class="flex-1 text-sm font-medium text-neutral-800 truncate min-w-0">
             {{ getDisplayName(player) }}
-            <span
-              v-if="player.id === store.myPlayerId"
-              class="ml-1.5 text-xs text-primary-600 font-normal"
-            >
+            <span v-if="player.id === store.myPlayerId" class="ml-1.5 text-xs text-primary-600 font-normal">
               (あなた)
             </span>
           </span>
-
-          <!-- 戦闘力補正ボタン（管理者のみ） -->
-          <div v-if="isOwner" class="flex items-center gap-1 shrink-0">
-            <!-- 戦闘力スコア表示 -->
-            <span class="text-xs tabular-nums text-neutral-500 w-10 text-right">
-              <span class="font-semibold text-neutral-700">{{ effectiveScore(player) }}</span>
-              <span
-                v-if="(player.score_offset ?? 0) !== 0"
-                class="ml-0.5"
-                :class="(player.score_offset ?? 0) > 0 ? 'text-blue-500' : 'text-red-500'"
-              >
-                {{ offsetLabel(player) }}
-              </span>
-            </span>
-            <!-- − ボタン -->
-            <button
-              @click="store.adjustScoreOffset(player.id, -1)"
-              class="w-6 h-6 flex items-center justify-center border border-neutral-200
-                     text-neutral-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600
-                     transition-colors text-sm leading-none"
-              :disabled="(player.score_offset ?? 0) <= -5"
-              title="戦闘力を-1"
-            >
-              −
-            </button>
-            <!-- + ボタン -->
-            <button
-              @click="store.adjustScoreOffset(player.id, 1)"
-              class="w-6 h-6 flex items-center justify-center border border-neutral-200
-                     text-neutral-500 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-600
-                     transition-colors text-sm leading-none"
-              :disabled="(player.score_offset ?? 0) >= 5"
-              title="戦闘力を+1"
-            >
-              ＋
-            </button>
-          </div>
-
-          <!-- 操作ボタン（権限がある場合のみ） -->
           <div v-if="canEdit(player)" class="flex gap-1 shrink-0">
             <button
               @click="startEdit(player)"
               class="text-xs px-2 py-1 border border-neutral-200 text-neutral-600
                      hover:bg-neutral-50 transition-colors"
               :disabled="store.isLoading"
-            >
-              編集
-            </button>
-            <button
-              v-if="isOwner"
-              @click="handleDelete(player)"
-              class="text-xs px-2 py-1 border border-red-200 text-red-600
-                     hover:bg-red-50 transition-colors"
-              :disabled="store.isLoading"
-            >
-              削除
-            </button>
+            >編集</button>
           </div>
         </div>
 
@@ -204,10 +199,7 @@ function offsetLabel(player: Player): string {
           v-if="editingId === player.id"
           class="border-t border-neutral-100 bg-neutral-50 px-3 py-3"
         >
-          <form
-            @submit.prevent="saveEdit"
-            class="flex flex-wrap gap-2 items-end"
-          >
+          <form @submit.prevent="saveEdit" class="flex flex-wrap gap-2 items-end">
             <div class="flex-1 min-w-28">
               <label class="block text-xs text-neutral-500 mb-1">名前</label>
               <input
@@ -234,17 +226,13 @@ function offsetLabel(player: Player): string {
                 type="submit"
                 class="btn-primary text-xs py-1.5 px-3"
                 :disabled="store.isLoading || !editName.trim()"
-              >
-                保存
-              </button>
+              >保存</button>
               <button
                 type="button"
                 class="btn-secondary text-xs py-1.5 px-3"
                 @click="cancelEdit"
                 :disabled="store.isLoading"
-              >
-                取消
-              </button>
+              >取消</button>
             </div>
           </form>
         </div>
