@@ -18,81 +18,61 @@
   }
 
   body {
-    @apply bg-white text-neutral-900;
+    @apply bg-neutral-100 text-neutral-900;
     font-family: 'Noto Sans JP', ui-sans-serif, system-ui, sans-serif;
-  }
-
-  * {
-    border-radius: 0 !important;
   }
 }
 
 @layer components {
-  /* ─── ボタン群 ─── */
+  /* ─── ボタン ─── */
 
   .btn {
     @apply
       inline-flex items-center justify-center gap-1.5
-      px-4 py-2
-      text-sm font-medium
-      border
+      text-sm font-medium leading-none
+      border transition-colors duration-100
       disabled:opacity-40 disabled:cursor-not-allowed
-      transition-colors duration-100
-      select-none;
+      select-none whitespace-nowrap;
   }
 
-  /* 黒塗りボタン（主要アクション） */
   .btn-primary {
-    @apply btn
+    @apply btn px-4 py-2
       bg-neutral-900 text-white border-neutral-900
-      hover:bg-neutral-700 hover:border-neutral-700;
+      hover:bg-neutral-700;
   }
 
-  /* オレンジ塗りボタン（最重要アクション: チーム分け実行） */
   .btn-accent {
-    @apply btn
+    @apply btn px-4 py-2
       bg-accent-600 text-white border-accent-600
-      hover:bg-accent-700 hover:border-accent-700;
+      hover:bg-accent-700;
   }
 
-  /* 白抜きボタン（副次アクション） */
   .btn-secondary {
-    @apply btn
-      bg-white text-neutral-700 border-neutral-300
-      hover:bg-neutral-50 hover:border-neutral-400;
+    @apply btn px-3 py-1.5
+      bg-white text-neutral-600 border-neutral-300
+      hover:bg-neutral-50 hover:text-neutral-900;
   }
 
-  /* 危険ボタン（削除） */
-  .btn-danger {
-    @apply btn
-      bg-white text-red-600 border-red-200
-      hover:bg-red-50 hover:border-red-300;
+  .btn-ghost {
+    @apply btn px-2 py-1
+      bg-transparent text-neutral-500 border-transparent
+      hover:bg-neutral-100 hover:text-neutral-900;
   }
 
-  /* ─── フォーム部品 ─── */
+  /* ─── フォーム ─── */
 
   .input-field {
-    @apply
-      block w-full
-      px-3 py-2
-      bg-white text-neutral-900
-      text-sm
-      border border-neutral-300
-      focus:outline-none focus:ring-1 focus:ring-neutral-900 focus:border-neutral-900
-      placeholder-neutral-400
-      transition-colors duration-100;
+    @apply block w-full px-3 py-2 text-sm
+      bg-white text-neutral-900 border border-neutral-300
+      focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-900
+      placeholder-neutral-400 transition-colors duration-100;
   }
 
   .select-field {
-    @apply
-      block w-full
-      px-3 py-2
-      bg-white text-neutral-900
-      text-sm
-      border border-neutral-300
-      focus:outline-none focus:ring-1 focus:ring-neutral-900 focus:border-neutral-900
-      transition-colors duration-100
-      cursor-pointer;
+    @apply block w-full px-3 py-2 text-sm
+      bg-white text-neutral-900 border border-neutral-300
+      focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-900
+      transition-colors duration-100 cursor-pointer;
     appearance: none;
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23737373' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
     background-position: right 0.5rem center;
@@ -101,15 +81,12 @@
     padding-right: 2.5rem;
   }
 
-  /* ─── スコア補正ボタン（± 小さいアイコンボタン） ─── */
-  .btn-offset {
-    @apply
-      w-6 h-6 flex items-center justify-center
-      border border-neutral-200
-      text-neutral-400 text-sm leading-none
-      hover:border-neutral-400 hover:text-neutral-900
+  /* ─── ±補正ボタン ─── */
+  .btn-nudge {
+    @apply w-7 h-7 flex items-center justify-center text-sm
+      border border-neutral-200 text-neutral-400
+      hover:border-neutral-400 hover:text-neutral-800 hover:bg-neutral-50
       disabled:opacity-30 disabled:cursor-not-allowed
-      transition-colors duration-100
-      select-none;
+      transition-colors duration-100 select-none;
   }
 }

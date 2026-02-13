@@ -1,12 +1,3 @@
-<!--
-  OwnerView.vue - 管理者画面
-  レイアウト: h-screen 固定（スクロールなし）
-    [ヘッダー 48px]
-    [ツールバー 48px]
-    [ボディ flex-1]
-      [左パネル 288px: 参加者管理]
-      [右パネル flex-1: チーム分け結果]
--->
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { usePlayersStore } from '@/stores/players'
@@ -15,24 +6,15 @@ import PlayerList from '@/components/PlayerList.vue'
 import TeamResult from '@/components/TeamResult.vue'
 
 const store = usePlayersStore()
-
 const isBalancing = ref(false)
 const showSelfAddForm = ref(false)
 const showOtherAddForm = ref(false)
-
 const selfAdded = computed(() => store.myPlayerId !== null)
 
 async function handleBalance() {
-  if (store.playerCount < 2) {
-    alert('チーム分けには2人以上の参加者が必要です')
-    return
-  }
+  if (store.playerCount < 2) { alert('2人以上必要です'); return }
   isBalancing.value = true
-  try {
-    await store.balanceTeams()
-  } finally {
-    isBalancing.value = false
-  }
+  try { await store.balanceTeams() } finally { isBalancing.value = false }
 }
 
 async function handleDisband() {
@@ -41,171 +23,130 @@ async function handleDisband() {
 }
 
 async function handleTeamCountChange(e: Event) {
-  const count = parseInt((e.target as HTMLSelectElement).value)
-  await store.updateConfig(count)
+  await store.updateConfig(parseInt((e.target as HTMLSelectElement).value))
 }
 
-function toggleSelfForm() {
-  showSelfAddForm.value = !showSelfAddForm.value
-  showOtherAddForm.value = false
-}
-
-function toggleOtherForm() {
-  showOtherAddForm.value = !showOtherAddForm.value
-  showSelfAddForm.value = false
-}
+function toggleSelf() { showSelfAddForm.value = !showSelfAddForm.value; showOtherAddForm.value = false }
+function toggleOther() { showOtherAddForm.value = !showOtherAddForm.value; showSelfAddForm.value = false }
+function closeForm() { showSelfAddForm.value = false; showOtherAddForm.value = false }
 </script>
 
 <template>
-  <div class="h-screen flex flex-col overflow-hidden bg-neutral-50">
+  <div class="h-screen flex flex-col overflow-hidden bg-neutral-100">
 
-    <!-- ══ ヘッダー 48px ══ -->
-    <header class="flex-none h-12 bg-neutral-950 flex items-center px-4 gap-3">
-      <h1 class="text-sm font-semibold text-white tracking-tight">
+    <!-- ══ ヘッダー ══ -->
+    <header class="flex-none h-14 bg-neutral-900 flex items-center px-5 gap-3 shadow-sm">
+      <h1 class="text-base font-bold text-white tracking-tight">
         チーム決め<span class="text-accent-400">一発</span>くん
       </h1>
-      <span class="text-[10px] font-semibold tracking-widest uppercase text-neutral-400 border border-neutral-700 px-1.5 py-0.5">
+      <span class="text-[10px] font-semibold tracking-widest uppercase text-neutral-400 border border-neutral-700 px-1.5 py-0.5 leading-tight">
         OWNER
       </span>
       <div class="flex-1" />
-      <!-- サマリー -->
-      <div class="flex items-center gap-4 text-right">
-        <div>
-          <span class="text-lg font-bold tabular-nums text-white font-mono">{{ store.playerCount }}</span>
-          <span class="text-xs text-neutral-500 ml-1">人</span>
+      <div class="flex items-center gap-5">
+        <div class="text-center">
+          <div class="text-xl font-bold font-mono text-white leading-none">{{ store.playerCount }}</div>
+          <div class="text-[10px] text-neutral-500 mt-0.5">参加者</div>
         </div>
-        <div>
-          <span class="text-lg font-bold tabular-nums text-white font-mono">{{ store.config.team_count }}</span>
-          <span class="text-xs text-neutral-500 ml-1">チーム</span>
+        <div class="text-center">
+          <div class="text-xl font-bold font-mono text-white leading-none">{{ store.config.team_count }}</div>
+          <div class="text-[10px] text-neutral-500 mt-0.5">チーム</div>
         </div>
       </div>
     </header>
 
-    <!-- ══ ツールバー 48px ══ -->
-    <div class="flex-none h-12 bg-white border-b border-neutral-200 flex items-center px-4 gap-2">
-      <!-- チーム数 -->
-      <label class="text-xs text-neutral-500 whitespace-nowrap">チーム数</label>
-      <select
-        :value="store.config.team_count"
-        @change="handleTeamCountChange"
-        class="select-field w-16 text-xs py-1"
-        :disabled="store.isLoading"
-      >
+    <!-- ══ ツールバー ══ -->
+    <div class="flex-none h-12 bg-white border-b border-neutral-200 flex items-center px-5 gap-2.5 shadow-sm">
+      <label class="text-xs text-neutral-500 shrink-0">チーム数</label>
+      <select :value="store.config.team_count" @change="handleTeamCountChange" class="select-field w-16 py-1 text-sm" :disabled="store.isLoading">
         <option v-for="n in [2,3,4,5,6]" :key="n" :value="n">{{ n }}</option>
       </select>
 
-      <div class="w-px h-5 bg-neutral-200 mx-1" />
+      <div class="w-px h-5 bg-neutral-200 mx-0.5" />
 
-      <!-- 参加者追加ボタン群 -->
-      <button
-        @click="toggleSelfForm"
-        class="btn-secondary text-xs px-3 py-1.5 h-8"
-        :disabled="selfAdded"
-        :class="{ 'opacity-40 cursor-not-allowed': selfAdded }"
-        :title="selfAdded ? '登録済み' : '自分を追加'"
-      >
-        自分を追加
-        <span v-if="selfAdded" class="text-emerald-600 ml-0.5">✓</span>
-        <span v-else-if="showSelfAddForm" class="text-neutral-400 ml-0.5">▲</span>
+      <button @click="toggleSelf" class="btn-secondary" :disabled="selfAdded" :class="{ 'opacity-40 cursor-not-allowed': selfAdded }">
+        自分を追加 <span v-if="selfAdded" class="text-emerald-600">✓</span>
       </button>
-
-      <button
-        @click="toggleOtherForm"
-        class="btn-secondary text-xs px-3 py-1.5 h-8"
-      >
-        他人を追加
-        <span v-if="showOtherAddForm" class="text-neutral-400 ml-0.5">▲</span>
-      </button>
+      <button @click="toggleOther" class="btn-secondary">他人を追加</button>
 
       <div class="flex-1" />
 
-      <!-- チーム解散 -->
-      <button
-        v-if="store.hasTeams"
-        @click="handleDisband"
-        class="btn-secondary text-xs px-3 py-1.5 h-8 text-neutral-500"
-        :disabled="store.isLoading"
-      >
-        解散
+      <button v-if="store.hasTeams" @click="handleDisband" class="btn-secondary text-neutral-500" :disabled="store.isLoading">
+        チーム解散
       </button>
-
-      <!-- チーム分け実行 -->
-      <button
-        @click="handleBalance"
-        :disabled="isBalancing || store.isLoading || store.playerCount < 2"
-        class="btn-accent text-xs px-4 py-1.5 h-8"
-      >
-        <svg v-if="isBalancing" class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+      <button @click="handleBalance" :disabled="isBalancing || store.isLoading || store.playerCount < 2" class="btn-accent">
+        <svg v-if="isBalancing" class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
           <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
           <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
         </svg>
-        {{ isBalancing ? '実行中...' : 'チーム分け' }}
+        {{ isBalancing ? '実行中...' : 'チーム分けを実行' }}
       </button>
     </div>
 
-    <!-- ══ ボディ: 左パネル + 右パネル ══ -->
+    <!-- ══ ボディ ══ -->
     <div class="flex-1 flex overflow-hidden">
 
-      <!-- ── 左パネル: 参加者管理 ── -->
-      <aside class="w-72 flex-none flex flex-col border-r border-neutral-200 bg-white overflow-hidden">
+      <!-- 左パネル -->
+      <aside class="w-[300px] flex-none flex flex-col bg-white border-r border-neutral-200 overflow-hidden">
 
-        <!-- 追加フォームエリア（折りたたみ） -->
-        <div
-          v-if="showSelfAddForm || showOtherAddForm"
-          class="flex-none border-b border-neutral-100 bg-neutral-50 px-4 py-3"
+        <!-- 追加フォーム（インライン） -->
+        <Transition
+          enter-active-class="transition-all duration-200 ease-out"
+          enter-from-class="opacity-0 -translate-y-1"
+          leave-active-class="transition-all duration-150 ease-in"
+          leave-to-class="opacity-0 -translate-y-1"
         >
-          <p class="text-xs text-neutral-500 mb-2">
-            {{ showSelfAddForm ? '自分の情報を登録（登録後はボタンが非活性になります）' : '参加者を追加' }}
-          </p>
-          <PlayerForm
-            :isOwner="showOtherAddForm"
-            :editTarget="null"
-            @done="() => { showSelfAddForm = false; showOtherAddForm = false }"
-            @cancel="() => { showSelfAddForm = false; showOtherAddForm = false }"
-          />
+          <div v-if="showSelfAddForm || showOtherAddForm" class="flex-none border-b border-neutral-200 bg-neutral-50 px-4 py-4">
+            <div class="flex items-center justify-between mb-3">
+              <p class="text-xs font-semibold text-neutral-600">
+                {{ showSelfAddForm ? '自分を追加（登録後は非活性になります）' : '参加者を追加' }}
+              </p>
+              <button @click="closeForm" class="text-neutral-400 hover:text-neutral-700 text-lg leading-none">×</button>
+            </div>
+            <PlayerForm
+              :isOwner="showOtherAddForm"
+              :editTarget="null"
+              @done="closeForm"
+              @cancel="closeForm"
+            />
+          </div>
+        </Transition>
+
+        <!-- 警告 -->
+        <div
+          v-if="store.playerCount > 0 && store.playerCount < store.config.team_count"
+          class="flex-none px-4 py-2.5 bg-amber-50 border-b border-amber-200 text-xs text-amber-700 flex gap-2"
+        >
+          <span>⚠</span>
+          <span>参加者({{ store.playerCount }})がチーム数({{ store.config.team_count }})より少ない</span>
         </div>
 
-        <!-- 参加者リスト（スクロール） -->
+        <!-- リスト（スクロール） -->
         <div class="flex-1 overflow-y-auto">
-          <!-- 警告バナー -->
-          <div
-            v-if="store.playerCount > 0 && store.playerCount < store.config.team_count"
-            class="px-4 py-2 bg-amber-50 border-b border-amber-100 text-xs text-amber-700 flex items-start gap-1.5"
-          >
-            <span class="shrink-0">⚠</span>
-            <span>参加者（{{ store.playerCount }}名）がチーム数（{{ store.config.team_count }}）より少ないです</span>
-          </div>
           <PlayerList :isOwner="true" />
         </div>
       </aside>
 
-      <!-- ── 右パネル: チーム分け結果 ── -->
-      <main class="flex-1 overflow-y-auto bg-neutral-50">
-        <!-- 待機状態のガイダンス -->
-        <div
-          v-if="!store.hasTeams && store.playerCount >= 2"
-          class="m-6 px-4 py-3 bg-white border border-neutral-200 text-sm"
-        >
-          <p class="font-medium text-neutral-800">
-            {{ store.playerCount }} 名登録済み — ツールバーの「チーム分け」を実行してください
-          </p>
+      <!-- 右パネル -->
+      <main class="flex-1 overflow-y-auto">
+        <div v-if="!store.hasTeams && store.playerCount >= 2" class="m-5 p-4 bg-white border border-neutral-200 shadow-sm">
+          <p class="text-sm font-semibold text-neutral-700">{{ store.playerCount }} 名が登録されました</p>
+          <p class="text-xs text-neutral-400 mt-1">ツールバーの「チーム分けを実行」を押すと {{ store.config.team_count }} チームに分けます</p>
         </div>
-
         <TeamResult />
       </main>
     </div>
 
   </div>
 
-  <!-- エラー/ローディングインジケーター（右下固定） -->
-  <div
-    v-if="store.isLoading"
-    class="fixed bottom-4 right-4 flex items-center gap-2 bg-neutral-900 text-white text-xs px-3 py-2"
-  >
-    <svg class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
-      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-    </svg>
-    同期中
-  </div>
+  <!-- ローディングインジケーター -->
+  <Transition enter-active-class="transition-opacity duration-150" leave-active-class="transition-opacity duration-150" enter-from-class="opacity-0" leave-to-class="opacity-0">
+    <div v-if="store.isLoading" class="fixed bottom-4 right-4 flex items-center gap-2 bg-neutral-900/90 text-white text-xs px-3 py-2 shadow-lg backdrop-blur-sm">
+      <svg class="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+      </svg>
+      同期中
+    </div>
+  </Transition>
 </template>

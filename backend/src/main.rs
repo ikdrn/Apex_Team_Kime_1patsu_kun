@@ -168,19 +168,19 @@ fn resolve_duplicate_names(players: &mut Vec<Player>) {
 }
 
 // ───────────────────────────────────────────────────────────
-// balance_teams - 戦闘力均衡化チーム分けアルゴリズム（ランダム性付き）
+// balance_teams - 戦闘力均衡化チーム分けアルゴリズム（マルチトライ方式）
 //
-// 【ランダム性の実装方法】
-//   pure 貪欲法（毎回同じ結果）に「スコア帯内シャッフル」を追加する。
+// 【ランダム性と均衡性の両立】
+//   30回の試行を行い、その中で最もスコア差が小さいチーム分けを採用する。
 //
-//   1. プレイヤーを effective_score 降順でソート
-//   2. 同じスコアのプレイヤーをランダムにシャッフル
-//      → 例: プレデター(15)が3人いたとき、どのチームに誰が入るかランダム
-//   3. さらに全体にわずかな乱数ノイズを加えてソート（±1 の揺らぎ）
-//      → 異なるスコア帯の境界でも多様性が生まれる
-//   4. 貪欲法でチームに割り当て
+//   各試行:
+//     1. プレイヤーを完全にシャッフル（全員の順序をランダム化）
+//     2. effective_score 降順でソート（同スコアは1の結果でランダムな順）
+//     3. 貪欲法でチームに割り当て（最も合計スコアの低いチームへ）
 //
-//   この設計で「毎回違うチーム」「でも大きな偏りは生まれない」を両立する
+//   この方式により:
+//   - 同じランク構成でも毎回異なるチーム編成になる
+//   - 30回の試行から最良のバランスを選ぶので大きな偏りが生まれない
 // ───────────────────────────────────────────────────────────
 fn balance_teams(players: &[Player], team_count: usize) -> Vec<Team> {
     let team_count = team_count.max(1).min(players.len().max(1));
@@ -192,50 +192,53 @@ fn balance_teams(players: &[Player], team_count: usize) -> Vec<Team> {
     }
 
     let mut rng = thread_rng();
+    let mut best_teams: Option<Vec<Team>> = None;
+    let mut best_diff = i32::MAX;
 
-    // ── Step 1: スコア降順ソート ──
-    let mut sorted: Vec<Player> = players.to_vec();
-    sorted.sort_by(|a, b| b.effective_score().cmp(&a.effective_score()));
+    // 30回試行して最もスコア差の小さい結果を採用
+    for _ in 0..30 {
+        // Step 1: 完全ランダムシャッフル
+        let mut shuffled: Vec<Player> = players.to_vec();
+        shuffled.shuffle(&mut rng);
 
-    // ── Step 2: 同スコア帯内シャッフル ──
-    // 同じ effective_score を持つプレイヤーのグループをランダムに並び替える
-    let mut i = 0;
-    while i < sorted.len() {
-        let score = sorted[i].effective_score();
-        let mut j = i + 1;
-        while j < sorted.len() && sorted[j].effective_score() == score {
-            j += 1;
+        // Step 2: 降順ソート（同スコアはシャッフル済みなのでランダムな順になる）
+        shuffled.sort_by(|a, b| b.effective_score().cmp(&a.effective_score()));
+
+        // Step 3: 貪欲法でチームに割り当て
+        let mut team_scores: Vec<i32> = vec![0; team_count];
+        let mut team_players: Vec<Vec<Player>> = vec![vec![]; team_count];
+
+        for player in &shuffled {
+            let min_idx = team_scores
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, &s)| s)
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+            team_scores[min_idx] += player.effective_score();
+            team_players[min_idx].push(player.clone());
         }
-        // i..j が同スコアのグループ → このスライスをシャッフル
-        sorted[i..j].shuffle(&mut rng);
-        i = j;
+
+        // Step 4: スコア差を計算
+        let diff = team_scores.iter().max().unwrap_or(&0)
+            - team_scores.iter().min().unwrap_or(&0);
+
+        if diff < best_diff {
+            best_diff = diff;
+            best_teams = Some(
+                team_players
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, pls)| {
+                        let total: i32 = pls.iter().map(|p| p.effective_score()).sum();
+                        Team { id: i + 1, players: pls, total_score: total }
+                    })
+                    .collect(),
+            );
+        }
     }
 
-    // ── Step 3: 貪欲法でチームに割り当て ──
-    let mut team_scores: Vec<i32> = vec![0; team_count];
-    let mut team_players: Vec<Vec<Player>> = vec![vec![]; team_count];
-
-    for player in sorted {
-        let min_idx = team_scores
-            .iter()
-            .enumerate()
-            .min_by_key(|(_, &s)| s)
-            .map(|(i, _)| i)
-            .unwrap_or(0);
-
-        team_scores[min_idx] += player.effective_score();
-        team_players[min_idx].push(player);
-    }
-
-    // ── Step 4: Team 構造体に変換 ──
-    team_players
-        .into_iter()
-        .enumerate()
-        .map(|(i, players)| {
-            let total_score: i32 = players.iter().map(|p| p.effective_score()).sum();
-            Team { id: i + 1, players, total_score }
-        })
-        .collect()
+    best_teams.unwrap_or_default()
 }
 
 // ============================================================
