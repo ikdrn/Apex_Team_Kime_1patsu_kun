@@ -48,13 +48,13 @@ impl Rank {
     // ブロンズ(1)〜プレデター(15) の非線形スケール
     pub fn base_score(&self) -> i32 {
         match self {
-            Rank::Bronze   => 1,
-            Rank::Silver   => 2,
-            Rank::Gold     => 3,
-            Rank::Platinum => 5,
-            Rank::Diamond  => 7,
-            Rank::Master   => 10,
-            Rank::Predator => 15,
+            Rank::Bronze   => 10,
+            Rank::Silver   => 20,
+            Rank::Gold     => 30,
+            Rank::Platinum => 40,
+            Rank::Diamond  => 50,
+            Rank::Master   => 60,
+            Rank::Predator => 70,
         }
     }
 }
@@ -319,8 +319,8 @@ async fn adjust_offset(
 
     let mut state = state.write().unwrap();
     if let Some(player) = state.players.iter_mut().find(|p| p.id == id) {
-        // -5〜+5 の範囲でクランプ
-        player.score_offset = (player.score_offset + delta).clamp(-5, 5);
+        // -3〜+3 の範囲でクランプ
+        player.score_offset = (player.score_offset + delta).clamp(-3, 3);
         let updated = player.clone();
         state.teams = None;
         return (StatusCode::OK, Json(serde_json::json!({ "player": updated })));
