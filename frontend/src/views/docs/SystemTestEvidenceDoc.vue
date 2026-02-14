@@ -192,9 +192,16 @@ const router = useRouter()
             </div>
             <p class="text-sm text-neutral-700 leading-relaxed">
               全8件の総合テストが合格しました。4つのシナリオすべてにおいて期待通りの動作が確認できました。
-              コードレビューで発見された不具合（テストアサーション値の誤り・コメント不一致・ポーリング未実装・grid-cols重複バグ・バリデーション不足・prop命名の不明確さ）は
-              すべて修正済みです。本システムのリリースを承認します。
+              コードレビューで発見された下記の不具合はすべて修正済みです。本システムのリリースを承認します。
             </p>
+            <ul class="mt-2 space-y-1 text-xs text-neutral-600">
+              <li class="flex gap-2"><span class="text-emerald-600 font-bold shrink-0">✓</span>二重ポーリングバグ（App.vue と各Viewで2重にタイマーが起動していた）を修正</li>
+              <li class="flex gap-2"><span class="text-emerald-600 font-bold shrink-0">✓</span>バックグラウンドポーリング中にローディング表示がチラつく問題を修正（silent モード追加）</li>
+              <li class="flex gap-2"><span class="text-emerald-600 font-bold shrink-0">✓</span>ポーリングで設定（チーム数）が更新されなかった問題を修正（fetchConfig を追加）</li>
+              <li class="flex gap-2"><span class="text-emerald-600 font-bold shrink-0">✓</span>コメントの誤記（-5〜+5 → -3〜+3）を修正</li>
+              <li class="flex gap-2"><span class="text-emerald-600 font-bold shrink-0">✓</span>PlayerList.vueのユーザーモード内に残っていたデッドコード（props.isOwner 判定）を除去</li>
+              <li class="flex gap-2"><span class="text-emerald-600 font-bold shrink-0">✓</span>バックエンドの team_count に上限がなかった問題を修正（最大20に制限）</li>
+            </ul>
           </div>
           <div class="p-3 bg-amber-50 border border-amber-200 text-xs text-amber-800">
             <p class="font-bold mb-1">⚠ 既知の制限事項（次バージョンで対応予定）</p>

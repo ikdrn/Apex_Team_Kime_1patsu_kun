@@ -2,7 +2,7 @@
 // main.rs - チーム決め一発くん バックエンドサーバー（v4）
 //
 // 【v4 変更点】
-//   1. score_offset フィールド追加（プレイヤーごとの戦闘力補正値 -5〜+5）
+//   1. score_offset フィールド追加（プレイヤーごとの戦闘力補正値 -3〜+3）
 //   2. ランダム性付与（同スコア帯でシャッフル → 毎回違うチーム編成）
 //   3. PATCH /api/players/:id/offset エンドポイント追加（±1ずつ調整）
 //   4. DELETE /api/teams エンドポイント追加（チーム解散）
@@ -369,7 +369,8 @@ async fn update_config(
     Json(req): Json<UpdateConfigRequest>,
 ) -> impl IntoResponse {
     let mut state = state.write().unwrap();
-    state.config.team_count = req.team_count.max(2);
+    // チーム数: 最小2、最大20（フロントは2〜6だがAPIへの直接送信を防ぐため上限を設ける）
+    state.config.team_count = req.team_count.clamp(2, 20);
     state.teams = None;
     Json(serde_json::json!({ "config": state.config }))
 }

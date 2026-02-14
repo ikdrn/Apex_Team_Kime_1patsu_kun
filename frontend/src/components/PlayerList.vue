@@ -92,7 +92,7 @@ function effectiveScore(p: Player) {
           <span class="flex-1 text-sm text-neutral-800 truncate min-w-0">{{ getDisplayName(player) }}</span>
           <span v-if="player.id === store.myPlayerId" class="shrink-0 text-xs text-primary-600 font-medium">(自分)</span>
           <button
-            v-if="props.isOwner || player.id === store.myPlayerId"
+            v-if="player.id === store.myPlayerId"
             @click="startEdit(player)"
             class="btn-ghost text-xs py-1 opacity-0 group-hover:opacity-100 shrink-0"
           >編集</button>

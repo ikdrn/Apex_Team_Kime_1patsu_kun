@@ -102,17 +102,19 @@ export const usePlayersStore = defineStore('players', () => {
 
   // ─────────────────────────────────────────────────────────
   // fetchPlayers - サーバーから全プレイヤーを取得する
+  //
+  // silent=true のときは isLoading を変更しない（バックグラウンドポーリング用）
   // ─────────────────────────────────────────────────────────
-  async function fetchPlayers() {
+  async function fetchPlayers(silent = false) {
     try {
-      isLoading.value = true
+      if (!silent) isLoading.value = true
       const res = await api.get<{ players: Player[] }>('/players')
       players.value = res.data.players
     } catch (e) {
-      setError('プレイヤー一覧の取得に失敗しました')
+      if (!silent) setError('プレイヤー一覧の取得に失敗しました')
       console.error('[fetchPlayers]', e)
     } finally {
-      isLoading.value = false
+      if (!silent) isLoading.value = false
     }
   }
 
@@ -130,8 +132,10 @@ export const usePlayersStore = defineStore('players', () => {
 
   // ─────────────────────────────────────────────────────────
   // fetchTeams - 最後のチーム分け結果を取得する（ページリロード後の復元用）
+  //
+  // silent=true のときはエラーをユーザーに通知しない（バックグラウンドポーリング用）
   // ─────────────────────────────────────────────────────────
-  async function fetchTeams() {
+  async function fetchTeams(silent = false) {
     try {
       const res = await api.get<{ teams: Team[] }>('/teams')
       teams.value = res.data.teams
@@ -244,7 +248,7 @@ export const usePlayersStore = defineStore('players', () => {
   // ─────────────────────────────────────────────────────────
   // adjustScoreOffset - プレイヤーのスコア補正値を±1調整する（管理者のみ使用）
   //
-  // バックエンドでは −5〜+5 にクランプされる
+  // バックエンドでは −3〜+3 にクランプされる
   // ─────────────────────────────────────────────────────────
   async function adjustScoreOffset(id: string, delta: number): Promise<boolean> {
     try {
@@ -334,11 +338,12 @@ export const usePlayersStore = defineStore('players', () => {
   //
   // 管理者がチーム分けを実行したとき、一般ユーザー画面にも
   // 自動的に結果が反映されるようにするためのポーリング処理。
+  // silent=true で isLoading を変化させず、ローディング表示をチラつかせない。
   // ─────────────────────────────────────────────────────────
   function startPolling() {
     if (pollingTimer !== null) return // 二重起動防止
     pollingTimer = setInterval(async () => {
-      await Promise.all([fetchPlayers(), fetchTeams()])
+      await Promise.all([fetchPlayers(true), fetchTeams(true), fetchConfig()])
     }, 3000)
   }
 

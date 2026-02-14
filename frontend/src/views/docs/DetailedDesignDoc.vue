@@ -212,7 +212,7 @@ const router = useRouter()
             </div>
             <div class="border border-neutral-200 bg-neutral-50 p-3">
               <p class="font-bold text-neutral-700 mb-1">②3秒ごとに自動取得</p>
-              <p class="text-neutral-600">プレイヤー一覧 / チーム分け結果を定期的にサーバーから取得</p>
+              <p class="text-neutral-600">プレイヤー一覧 / チーム分け結果 / 設定（チーム数）を定期的にサーバーから取得。バックグラウンド動作のためローディング表示は出ない。</p>
             </div>
             <div class="border border-emerald-200 bg-emerald-50 p-3">
               <p class="font-bold text-emerald-700 mb-1">③ページを閉じると停止</p>
