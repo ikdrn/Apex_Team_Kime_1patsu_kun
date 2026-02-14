@@ -12,7 +12,7 @@ use axum::{
     extract::{Path, State},
     http::{Method, StatusCode},
     response::{IntoResponse, Json},
-    routing::{delete, get, patch, post, put},
+    routing::{get, patch, post, put},
     Router,
 };
 use rand::seq::SliceRandom; // シャッフル用
@@ -312,9 +312,9 @@ async fn update_player(
         player.display_name = None;
         let updated = player.clone();
         state.teams = None;
-        return (StatusCode::OK, Json(serde_json::json!({ "player": updated })));
+        return (StatusCode::OK, Json(serde_json::json!({ "player": updated }))).into_response();
     }
-    (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "プレイヤーが見つかりません" })))
+    (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "プレイヤーが見つかりません" }))).into_response()
 }
 
 async fn delete_player(
