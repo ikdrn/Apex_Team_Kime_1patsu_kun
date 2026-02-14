@@ -5,24 +5,24 @@ const router = useRouter()
 
 <template>
   <div class="min-h-screen bg-neutral-100">
-    <header class="bg-emerald-700 text-white px-6 py-4 flex items-center gap-4 shadow">
-      <button @click="router.push('/owner/docs')" class="text-emerald-200 hover:text-white transition-colors text-sm">← 設計書一覧に戻る</button>
-      <div class="w-px h-4 bg-emerald-500" />
+    <header class="bg-neutral-900 text-white px-6 py-4 flex items-center gap-4 shadow">
+      <button @click="router.push('/owner/docs')" class="text-neutral-400 hover:text-white transition-colors text-sm">← 設計書一覧に戻る</button>
+      <div class="w-px h-4 bg-neutral-600" />
       <h1 class="text-base font-bold">🧪 単体テスト仕様書</h1>
       <div class="flex-1" />
-      <span class="text-xs text-emerald-200">バージョン 1.0 ／ 2025年作成</span>
+      <span class="text-xs text-neutral-400">初版 ／ 2025年作成</span>
     </header>
 
     <div class="max-w-4xl mx-auto px-6 py-8 space-y-8">
 
       <!-- テスト方針 -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-emerald-600 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">1. テスト方針</h2>
         </div>
         <div class="p-5 space-y-3">
-          <div class="p-4 bg-emerald-50 border-l-4 border-emerald-400">
-            <p class="text-sm font-semibold text-emerald-800 mb-1">🎯 単体テストとは？</p>
+          <div class="p-4 bg-neutral-50 border-l-4 border-neutral-400">
+            <p class="text-sm font-semibold text-neutral-800 mb-1">🎯 単体テストとは？</p>
             <p class="text-sm text-neutral-700">
               「部品」を単独でテストすることです。レストランに例えると、「料理を提供する前に食材や調味料を個別に確認する」イメージです。
               プログラムの各関数やロジックが、期待通りに動くかを個別に検証します。
@@ -48,7 +48,7 @@ const router = useRouter()
 
       <!-- テストケース一覧 -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-emerald-600 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">2. テストケース一覧</h2>
         </div>
         <div class="p-5 space-y-6">
@@ -56,7 +56,7 @@ const router = useRouter()
           <!-- UT-01: effective_score -->
           <div>
             <div class="flex items-center gap-2 mb-3">
-              <span class="bg-emerald-600 text-white text-xs font-bold px-2 py-0.5">UT-01</span>
+              <span class="bg-neutral-700 text-white text-xs font-bold px-2 py-0.5">UT-01</span>
               <span class="text-sm font-bold text-neutral-800">実効スコア計算 effective_score()</span>
             </div>
             <table class="w-full text-xs border-collapse">
@@ -87,7 +87,7 @@ const router = useRouter()
           <!-- UT-02: balance_teams -->
           <div>
             <div class="flex items-center gap-2 mb-3">
-              <span class="bg-emerald-600 text-white text-xs font-bold px-2 py-0.5">UT-02</span>
+              <span class="bg-neutral-700 text-white text-xs font-bold px-2 py-0.5">UT-02</span>
               <span class="text-sm font-bold text-neutral-800">チーム分けアルゴリズム balance_teams()</span>
             </div>
             <table class="w-full text-xs border-collapse">
@@ -118,7 +118,7 @@ const router = useRouter()
           <!-- UT-03: resolve_duplicate_names -->
           <div>
             <div class="flex items-center gap-2 mb-3">
-              <span class="bg-emerald-600 text-white text-xs font-bold px-2 py-0.5">UT-03</span>
+              <span class="bg-neutral-700 text-white text-xs font-bold px-2 py-0.5">UT-03</span>
               <span class="text-sm font-bold text-neutral-800">重複名解決 resolve_duplicate_names()</span>
             </div>
             <table class="w-full text-xs border-collapse">
@@ -148,7 +148,7 @@ const router = useRouter()
           <!-- UT-04: バリデーション -->
           <div>
             <div class="flex items-center gap-2 mb-3">
-              <span class="bg-emerald-600 text-white text-xs font-bold px-2 py-0.5">UT-04</span>
+              <span class="bg-neutral-700 text-white text-xs font-bold px-2 py-0.5">UT-04</span>
               <span class="text-sm font-bold text-neutral-800">プレイヤー名バリデーション</span>
             </div>
             <table class="w-full text-xs border-collapse">
@@ -178,6 +178,16 @@ const router = useRouter()
 
         </div>
       </section>
+
+      <!-- ページ下部ナビゲーション -->
+      <div class="pt-2 pb-8 border-t border-neutral-200">
+        <button
+          @click="router.push('/owner/docs')"
+          class="flex items-center gap-2 px-5 py-2.5 bg-neutral-800 text-white text-sm hover:bg-neutral-700 transition-colors"
+        >
+          ← 設計書一覧に戻る
+        </button>
+      </div>
 
     </div>
   </div>

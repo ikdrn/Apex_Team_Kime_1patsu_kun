@@ -5,24 +5,24 @@ const router = useRouter()
 
 <template>
   <div class="min-h-screen bg-neutral-100">
-    <header class="bg-amber-600 text-white px-6 py-4 flex items-center gap-4 shadow">
-      <button @click="router.push('/owner/docs')" class="text-amber-200 hover:text-white transition-colors text-sm">← 設計書一覧に戻る</button>
-      <div class="w-px h-4 bg-amber-400" />
+    <header class="bg-neutral-900 text-white px-6 py-4 flex items-center gap-4 shadow">
+      <button @click="router.push('/owner/docs')" class="text-neutral-400 hover:text-white transition-colors text-sm">← 設計書一覧に戻る</button>
+      <div class="w-px h-4 bg-neutral-600" />
       <h1 class="text-base font-bold">🔗 結合テスト仕様書</h1>
       <div class="flex-1" />
-      <span class="text-xs text-amber-200">バージョン 1.0 ／ 2025年作成</span>
+      <span class="text-xs text-neutral-400">初版 ／ 2025年作成</span>
     </header>
 
     <div class="max-w-4xl mx-auto px-6 py-8 space-y-8">
 
       <!-- テスト方針 -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-amber-500 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">1. テスト方針</h2>
         </div>
         <div class="p-5 space-y-3">
-          <div class="p-4 bg-amber-50 border-l-4 border-amber-400">
-            <p class="text-sm font-semibold text-amber-800 mb-1">🎯 結合テストとは？</p>
+          <div class="p-4 bg-neutral-50 border-l-4 border-neutral-400">
+            <p class="text-sm font-semibold text-neutral-800 mb-1">🎯 結合テストとは？</p>
             <p class="text-sm text-neutral-700">
               「部品を組み合わせたときに正しく連携して動くか」を確認するテストです。
               フロントエンド（画面）とバックエンド（サーバー）が、実際にAPIを通じて正しくデータをやりとりできるかを検証します。
@@ -47,7 +47,7 @@ const router = useRouter()
 
       <!-- API連携テスト -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-amber-500 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">2. APIエンドポイント連携テスト</h2>
         </div>
         <div class="p-5 space-y-5">
@@ -177,6 +177,16 @@ const router = useRouter()
           </div>
         </div>
       </section>
+
+      <!-- ページ下部ナビゲーション -->
+      <div class="pt-2 pb-8 border-t border-neutral-200">
+        <button
+          @click="router.push('/owner/docs')"
+          class="flex items-center gap-2 px-5 py-2.5 bg-neutral-800 text-white text-sm hover:bg-neutral-700 transition-colors"
+        >
+          ← 設計書一覧に戻る
+        </button>
+      </div>
 
     </div>
   </div>

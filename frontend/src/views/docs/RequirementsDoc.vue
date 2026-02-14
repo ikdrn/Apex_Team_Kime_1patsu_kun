@@ -6,30 +6,30 @@ const router = useRouter()
 <template>
   <div class="min-h-screen bg-neutral-100">
     <!-- ヘッダー -->
-    <header class="bg-blue-700 text-white px-6 py-4 flex items-center gap-4 shadow">
-      <button @click="router.push('/owner/docs')" class="text-blue-200 hover:text-white transition-colors text-sm">← 設計書一覧に戻る</button>
-      <div class="w-px h-4 bg-blue-500" />
+    <header class="bg-neutral-900 text-white px-6 py-4 flex items-center gap-4 shadow">
+      <button @click="router.push('/owner/docs')" class="text-neutral-400 hover:text-white transition-colors text-sm">← 設計書一覧に戻る</button>
+      <div class="w-px h-4 bg-neutral-600" />
       <h1 class="text-base font-bold">📋 要件定義書</h1>
       <div class="flex-1" />
-      <span class="text-xs text-blue-200">バージョン 1.0 ／ 2025年作成</span>
+      <span class="text-xs text-neutral-400">初版 ／ 2025年作成</span>
     </header>
 
     <div class="max-w-4xl mx-auto px-6 py-8 space-y-8">
 
       <!-- 1. 目的と背景 -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-blue-600 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">1. このシステムを作った目的と背景</h2>
         </div>
         <div class="p-5 space-y-4">
-          <div class="p-4 bg-blue-50 border-l-4 border-blue-400">
-            <p class="text-sm font-semibold text-blue-800 mb-1">📌 解決したかった問題</p>
+          <div class="p-4 bg-neutral-50 border-l-4 border-neutral-400">
+            <p class="text-sm font-semibold text-neutral-800 mb-1">📌 解決したかった問題</p>
             <p class="text-sm text-neutral-700">
               Apex Legends のカスタムマッチで複数チームに分かれて遊ぶとき、<strong>「なんとなく」でチームを決めると強いプレイヤーが偏ってしまい、試合が一方的になってしまう</strong> という問題がありました。
             </p>
           </div>
-          <div class="p-4 bg-emerald-50 border-l-4 border-emerald-400">
-            <p class="text-sm font-semibold text-emerald-800 mb-1">✅ このシステムで実現すること</p>
+          <div class="p-4 bg-neutral-50 border-l-4 border-neutral-300">
+            <p class="text-sm font-semibold text-neutral-800 mb-1">✅ このシステムで実現すること</p>
             <p class="text-sm text-neutral-700">
               参加者のゲーム内ランクと個人差を考慮して、<strong>自動的に公平なチームを組み分ける</strong> ことで、全員が楽しめるバランスのよい試合環境を提供します。
             </p>
@@ -39,7 +39,7 @@ const router = useRouter()
 
       <!-- 2. 利用者の種類 -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-blue-600 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">2. 利用者の種類（ユーザー種別）</h2>
         </div>
         <div class="p-5">
@@ -63,9 +63,9 @@ const router = useRouter()
               <div class="mt-3 text-xs text-neutral-500 bg-neutral-100 p-2">アクセスURL: <code>/owner</code></div>
             </div>
             <!-- ユーザー -->
-            <div class="border-2 border-blue-400 p-4">
+            <div class="border-2 border-neutral-400 p-4">
               <div class="flex items-center gap-2 mb-3">
-                <div class="w-8 h-8 bg-blue-500 text-white flex items-center justify-center text-sm font-bold">参</div>
+                <div class="w-8 h-8 bg-neutral-500 text-white flex items-center justify-center text-sm font-bold">参</div>
                 <div>
                   <p class="font-bold text-sm">一般ユーザー（参加者）</p>
                   <p class="text-xs text-neutral-500">カスタムマッチに参加するプレイヤー</p>
@@ -86,7 +86,7 @@ const router = useRouter()
 
       <!-- 3. 機能要件 -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-blue-600 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">3. 機能要件（システムが「できること」の一覧）</h2>
         </div>
         <div class="p-5">
@@ -129,7 +129,7 @@ const router = useRouter()
 
       <!-- 4. 非機能要件 -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-blue-600 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">4. 非機能要件（「どう動くか」の条件）</h2>
         </div>
         <div class="p-5 space-y-3">
@@ -139,7 +139,7 @@ const router = useRouter()
             { icon: '📱', label: '対応デバイス', content: 'PC・スマートフォン・タブレットのWebブラウザから利用できること（レスポンシブデザイン）' },
             { icon: '🛡️', label: 'データ保護', content: '設計書は管理者専用URL（/owner/docs）からのみアクセス可能とする' },
             { icon: '🔧', label: '保守性', content: 'ランクのスコアや補正値の範囲を、コードの1箇所を変更するだけで調整できること' },
-          ]" :key="item.label" class="flex gap-3 p-3 border border-neutral-100 bg-neutral-50">
+          ]" :key="item.label" class="flex gap-3 p-3 border border-neutral-200 bg-neutral-50">
             <span class="text-xl leading-none">{{ item.icon }}</span>
             <div>
               <p class="text-xs font-bold text-neutral-800 mb-0.5">{{ item.label }}</p>
@@ -151,7 +151,7 @@ const router = useRouter()
 
       <!-- 5. 制約条件 -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-blue-600 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">5. 制約条件（システムの制限事項）</h2>
         </div>
         <div class="p-5">
@@ -176,7 +176,7 @@ const router = useRouter()
 
       <!-- 6. 用語定義 -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-blue-600 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">6. 用語定義</h2>
         </div>
         <div class="p-5">
@@ -197,13 +197,24 @@ const router = useRouter()
                 ['重複名解決', '同じ名前の参加者が複数いるとき、「名前(1)」「名前(2)」と自動で区別する機能。'],
                 ['ポーリング', '3秒ごとに自動でサーバーに問い合わせて最新情報を取得する仕組み。'],
               ]" :key="term[0]" class="hover:bg-neutral-50">
-                <td class="border border-neutral-200 px-3 py-2 font-medium text-blue-700 text-xs">{{ term[0] }}</td>
+                <td class="border border-neutral-200 px-3 py-2 font-medium text-neutral-700 text-xs">{{ term[0] }}</td>
                 <td class="border border-neutral-200 px-3 py-2 text-xs text-neutral-700">{{ term[1] }}</td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
+
+      <!-- ページ下部ナビゲーション -->
+      <div class="pt-2 pb-8 border-t border-neutral-200">
+        <button
+          @click="router.push('/owner/docs')"
+          class="flex items-center gap-2 px-5 py-2.5 bg-neutral-800 text-white text-sm hover:bg-neutral-700 transition-colors"
+        >
+          ← 設計書一覧に戻る
+        </button>
+      </div>
+
     </div>
   </div>
 </template>

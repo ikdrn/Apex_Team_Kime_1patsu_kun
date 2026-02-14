@@ -5,19 +5,19 @@ const router = useRouter()
 
 <template>
   <div class="min-h-screen bg-neutral-100">
-    <header class="bg-blue-700 text-white px-6 py-4 flex items-center gap-4 shadow">
-      <button @click="router.push('/owner/docs')" class="text-blue-200 hover:text-white transition-colors text-sm">← 設計書一覧に戻る</button>
-      <div class="w-px h-4 bg-blue-500" />
+    <header class="bg-neutral-900 text-white px-6 py-4 flex items-center gap-4 shadow">
+      <button @click="router.push('/owner/docs')" class="text-neutral-400 hover:text-white transition-colors text-sm">← 設計書一覧に戻る</button>
+      <div class="w-px h-4 bg-neutral-600" />
       <h1 class="text-base font-bold">⚙️ 詳細設計書</h1>
       <div class="flex-1" />
-      <span class="text-xs text-blue-200">バージョン 1.0 ／ 2025年作成</span>
+      <span class="text-xs text-neutral-400">初版 ／ 2025年作成</span>
     </header>
 
     <div class="max-w-4xl mx-auto px-6 py-8 space-y-8">
 
       <!-- 1. チーム分けアルゴリズム詳細 -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-blue-600 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">1. チーム分けアルゴリズムの詳細（どうやって公平に分けるか）</h2>
         </div>
         <div class="p-5 space-y-4">
@@ -128,7 +128,7 @@ const router = useRouter()
 
       <!-- 2. 戦闘力補正のしくみ -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-blue-600 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">2. 戦闘力補正（スコアオフセット）のしくみ</h2>
         </div>
         <div class="p-5 space-y-4">
@@ -170,7 +170,7 @@ const router = useRouter()
 
       <!-- 3. 重複名解決ロジック -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-blue-600 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">3. 重複名解決ロジック（同じ名前の人がいたときの処理）</h2>
         </div>
         <div class="p-5 space-y-3">
@@ -201,7 +201,7 @@ const router = useRouter()
 
       <!-- 4. リアルタイム同期 -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-blue-600 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">4. リアルタイム同期の仕組み（ポーリング方式）</h2>
         </div>
         <div class="p-5 space-y-4">
@@ -228,7 +228,7 @@ const router = useRouter()
 
       <!-- 5. バリデーション仕様 -->
       <section class="bg-white border border-neutral-200 shadow-sm">
-        <div class="bg-blue-600 text-white px-5 py-3">
+        <div class="bg-neutral-700 text-white px-5 py-3">
           <h2 class="font-bold text-sm tracking-wider">5. 入力バリデーション仕様（入力チェックのルール）</h2>
         </div>
         <div class="p-5">
@@ -259,6 +259,16 @@ const router = useRouter()
           </table>
         </div>
       </section>
+
+      <!-- ページ下部ナビゲーション -->
+      <div class="pt-2 pb-8 border-t border-neutral-200">
+        <button
+          @click="router.push('/owner/docs')"
+          class="flex items-center gap-2 px-5 py-2.5 bg-neutral-800 text-white text-sm hover:bg-neutral-700 transition-colors"
+        >
+          ← 設計書一覧に戻る
+        </button>
+      </div>
 
     </div>
   </div>
