@@ -53,36 +53,36 @@ const router = useRouter()
 
           <div>
             <p class="text-xs font-bold text-neutral-700 mb-1">IT-A-01: プレイヤー追加確認</p>
-            <div class="bg-neutral-900 text-green-400 font-mono text-[10px] p-3 rounded leading-relaxed">
+            <div v-pre class="bg-neutral-900 text-green-400 font-mono text-[10px] p-3 rounded leading-relaxed">
               <p class="text-neutral-500"># プレイヤー追加</p>
               <p>$ curl -X POST http://localhost:8080/api/players \</p>
               <p>  -H "Content-Type: application/json" \</p>
-              <p>  -d '{{"name":"テストプレイヤー","rank":"ゴールド"}}'</p>
-              <p class="text-green-300 mt-1">{{"player":{{"id":"uuid-xxxx","name":"テストプレイヤー","rank":"ゴールド","score_offset":0}}}}</p>
+              <p>  -d '{"name":"テストプレイヤー","rank":"ゴールド"}'</p>
+              <p class="text-green-300 mt-1">{"player":{"id":"uuid-xxxx","name":"テストプレイヤー","rank":"ゴールド","score_offset":0}}</p>
               <p class="mt-2 text-neutral-500"># 一覧取得で確認</p>
               <p>$ curl http://localhost:8080/api/players</p>
-              <p class="text-green-300">{{"players":[{{"id":"uuid-xxxx","name":"テストプレイヤー",...}}]}}</p>
+              <p class="text-green-300">{"players":[{"id":"uuid-xxxx","name":"テストプレイヤー",...}]}</p>
               <p class="text-emerald-400 mt-1 font-bold">✓ 追加したプレイヤーが一覧に含まれることを確認</p>
             </div>
           </div>
 
           <div>
             <p class="text-xs font-bold text-neutral-700 mb-1">IT-B-04: プレイヤー0人でのチーム分けエラー</p>
-            <div class="bg-neutral-900 text-green-400 font-mono text-[10px] p-3 rounded leading-relaxed">
+            <div v-pre class="bg-neutral-900 text-green-400 font-mono text-[10px] p-3 rounded leading-relaxed">
               <p class="text-neutral-500"># プレイヤーが0人の状態でチーム分け実行</p>
               <p>$ curl -X POST http://localhost:8080/api/teams/balance</p>
-              <p class="text-red-400">{{"error":"プレイヤーが登録されていません"}} (HTTP 400)</p>
+              <p class="text-red-400">{"error":"プレイヤーが登録されていません"} (HTTP 400)</p>
               <p class="text-emerald-400 mt-1 font-bold">✓ 適切なエラーレスポンスが返却されることを確認</p>
             </div>
           </div>
 
           <div>
             <p class="text-xs font-bold text-neutral-700 mb-1">IT-C-02: チーム数最小値保護</p>
-            <div class="bg-neutral-900 text-green-400 font-mono text-[10px] p-3 rounded leading-relaxed">
+            <div v-pre class="bg-neutral-900 text-green-400 font-mono text-[10px] p-3 rounded leading-relaxed">
               <p class="text-neutral-500"># チーム数を1（最小値未満）に設定</p>
               <p>$ curl -X PUT http://localhost:8080/api/config \</p>
-              <p>  -d '{{"team_count":1}}'</p>
-              <p class="text-green-300">{{"config":{{"team_count":2}}}}</p>
+              <p>  -d '{"team_count":1}'</p>
+              <p class="text-green-300">{"config":{"team_count":2}}</p>
               <p class="text-emerald-400 mt-1 font-bold">✓ 1が2に補正されることを確認</p>
             </div>
           </div>
