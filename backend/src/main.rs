@@ -64,7 +64,7 @@ impl Rank {
 //
 // 【score_offset について】
 //   同じランクでも個人差があるため、管理者が ±1 ずつ調整できる補正値。
-//   範囲: -5〜+5（ランク間のスコア差は最小1なので ±5 で十分な表現力）
+//   範囲: -3〜+3（ランク間のスコア差は10なので ±3 で十分な表現力）
 //   デフォルト: 0（補正なし）
 // ───────────────────────────────────────────────────────────
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -72,7 +72,7 @@ pub struct Player {
     pub id: String,
     pub name: String,
     pub rank: Rank,
-    /// 個人差補正値（管理者が ±1 ずつ調整, 範囲: -5〜+5）
+    /// 個人差補正値（管理者が ±1 ずつ調整, 範囲: -3〜+3）
     #[serde(default)] // JSONに含まれない場合は 0 として扱う
     pub score_offset: i32,
     pub display_name: Option<String>,
@@ -134,7 +134,7 @@ pub struct UpdateConfigRequest {
 }
 
 /// PATCH /api/players/:id/offset のボディ
-/// delta = +1 または -1 のみ許可
+/// delta = +1 または -1 のみ許可（範囲外は clamp で ±1 に正規化される）
 #[derive(Debug, Deserialize)]
 pub struct AdjustOffsetRequest {
     pub delta: i32,
@@ -258,10 +258,24 @@ async fn add_player(
     State(state): State<SharedState>,
     Json(req): Json<AddPlayerRequest>,
 ) -> impl IntoResponse {
+    let name = req.name.trim().to_string();
+    // 名前バリデーション: 1文字以上30文字以下
+    if name.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "プレイヤー名を入力してください" })),
+        ).into_response();
+    }
+    if name.chars().count() > 30 {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "プレイヤー名は30文字以内で入力してください" })),
+        ).into_response();
+    }
     let mut state = state.write().unwrap();
     let new_player = Player {
         id: Uuid::new_v4().to_string(),
-        name: req.name.trim().to_string(),
+        name,
         rank: req.rank,
         score_offset: 0,
         display_name: None,
@@ -269,7 +283,7 @@ async fn add_player(
     let added = new_player.clone();
     state.players.push(new_player);
     state.teams = None;
-    (StatusCode::CREATED, Json(serde_json::json!({ "player": added })))
+    (StatusCode::CREATED, Json(serde_json::json!({ "player": added }))).into_response()
 }
 
 async fn update_player(
@@ -277,9 +291,23 @@ async fn update_player(
     Path(id): Path<String>,
     Json(req): Json<UpdatePlayerRequest>,
 ) -> impl IntoResponse {
+    let name = req.name.trim().to_string();
+    // 名前バリデーション: 1文字以上30文字以下
+    if name.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "プレイヤー名を入力してください" })),
+        ).into_response();
+    }
+    if name.chars().count() > 30 {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "プレイヤー名は30文字以内で入力してください" })),
+        ).into_response();
+    }
     let mut state = state.write().unwrap();
     if let Some(player) = state.players.iter_mut().find(|p| p.id == id) {
-        player.name = req.name.trim().to_string();
+        player.name = name;
         player.rank = req.rank;
         player.display_name = None;
         let updated = player.clone();
@@ -309,7 +337,7 @@ async fn delete_player(
 //
 // 【設計】
 //   delta = +1 または -1 のみ受け付ける。
-//   範囲: -5〜+5 でクランプ（それ以上は変化なし）。
+//   範囲: -3〜+3 でクランプ（それ以上は変化なし）。
 //   チーム分け結果は無効化される（補正値が変わったため）。
 // ───────────────────────────────────────────────────────────
 async fn adjust_offset(
@@ -452,11 +480,16 @@ mod tests {
     fn test_effective_score_with_offset() {
         let p = Player { id: "1".into(), name: "A".into(), rank: Rank::Gold,
                          score_offset: 2, display_name: None };
-        assert_eq!(p.effective_score(), 5); // Gold(3) + 2 = 5
+        assert_eq!(p.effective_score(), 32); // Gold(30) + 2 = 32
 
         let p2 = Player { id: "2".into(), name: "B".into(), rank: Rank::Bronze,
                           score_offset: -3, display_name: None };
-        assert_eq!(p2.effective_score(), 1); // Bronze(1) - 3 = -2 → clamp to 1
+        assert_eq!(p2.effective_score(), 7); // Bronze(10) - 3 = 7（clamp は不要）
+
+        // clamp 動作確認: Bronze(10) + offset が極端に負でも最低値1になること
+        let p3 = Player { id: "3".into(), name: "C".into(), rank: Rank::Bronze,
+                          score_offset: -10, display_name: None };
+        assert_eq!(p3.effective_score(), 1); // Bronze(10) - 10 = 0 → clamp to 1
     }
 
     #[test]

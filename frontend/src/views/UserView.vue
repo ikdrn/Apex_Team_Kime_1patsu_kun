@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { usePlayersStore } from '@/stores/players'
 import PlayerForm from '@/components/PlayerForm.vue'
 import PlayerList from '@/components/PlayerList.vue'
@@ -8,6 +8,9 @@ import TeamResult from '@/components/TeamResult.vue'
 const store = usePlayersStore()
 const showEditForm = ref(false)
 const isNotRegistered = computed(() => !store.myPlayer)
+
+onMounted(() => store.startPolling())
+onUnmounted(() => store.stopPolling())
 </script>
 
 <template>
@@ -36,7 +39,7 @@ const isNotRegistered = computed(() => !store.myPlayer)
           <!-- 未登録 -->
           <div v-if="isNotRegistered" class="px-4 py-4">
             <p class="text-xs font-semibold text-neutral-500 mb-3">名前とランクを入力して参加登録してください</p>
-            <PlayerForm :isOwner="false" :editTarget="null" @done="() => {}" @cancel="() => {}" />
+            <PlayerForm :addForOther="false" :editTarget="null" @done="() => {}" @cancel="() => {}" />
           </div>
           <!-- 登録済み -->
           <div v-else class="px-4 py-3">
@@ -55,7 +58,7 @@ const isNotRegistered = computed(() => !store.myPlayer)
             </div>
             <Transition enter-active-class="transition-all duration-200" enter-from-class="opacity-0" leave-active-class="transition-all duration-150" leave-to-class="opacity-0">
               <div v-if="showEditForm" class="mt-3 pt-3 border-t border-neutral-100">
-                <PlayerForm :isOwner="false" :editTarget="store.myPlayer ?? null" @done="() => { showEditForm = false }" @cancel="() => { showEditForm = false }" />
+                <PlayerForm :addForOther="false" :editTarget="store.myPlayer ?? null" @done="() => { showEditForm = false }" @cancel="() => { showEditForm = false }" />
               </div>
             </Transition>
           </div>

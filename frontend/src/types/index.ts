@@ -67,7 +67,7 @@ export interface Player {
   /** ランク */
   rank: RankName
   /**
-   * スコア補正値（−5〜+5）
+   * スコア補正値（−3〜+3）
    * 管理者が±1ずつ調整可能。デフォルト0。
    */
   score_offset: number

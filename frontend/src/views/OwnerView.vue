@@ -1,15 +1,21 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { usePlayersStore } from '@/stores/players'
+import { useRouter } from 'vue-router'
 import PlayerForm from '@/components/PlayerForm.vue'
 import PlayerList from '@/components/PlayerList.vue'
 import TeamResult from '@/components/TeamResult.vue'
+
+const router = useRouter()
 
 const store = usePlayersStore()
 const isBalancing = ref(false)
 const showSelfAddForm = ref(false)
 const showOtherAddForm = ref(false)
 const selfAdded = computed(() => store.myPlayerId !== null)
+
+onMounted(() => store.startPolling())
+onUnmounted(() => store.stopPolling())
 
 async function handleBalance() {
   if (store.playerCount < 2) { alert('2人以上必要です'); return }
@@ -52,6 +58,12 @@ function closeForm() { showSelfAddForm.value = false; showOtherAddForm.value = f
           <div class="text-xl font-bold font-mono text-white leading-none">{{ store.config.team_count }}</div>
           <div class="text-[10px] text-neutral-500 mt-0.5">チーム</div>
         </div>
+        <button
+          @click="router.push('/owner/docs')"
+          class="text-xs text-neutral-400 border border-neutral-600 hover:border-neutral-400 hover:text-neutral-200 px-2.5 py-1 transition-colors"
+        >
+          設計書
+        </button>
       </div>
     </header>
 
@@ -104,7 +116,7 @@ function closeForm() { showSelfAddForm.value = false; showOtherAddForm.value = f
               <button @click="closeForm" class="text-neutral-400 hover:text-neutral-700 text-lg leading-none">×</button>
             </div>
             <PlayerForm
-              :isOwner="showOtherAddForm"
+              :addForOther="showOtherAddForm"
               :editTarget="null"
               @done="closeForm"
               @cancel="closeForm"
