@@ -61,6 +61,9 @@ export const usePlayersStore = defineStore('players', () => {
    */
   const myPlayerId = ref<string | null>(null)
 
+  /** ポーリングのタイマーID（3秒ごとにサーバーと同期） */
+  let pollingTimer: ReturnType<typeof setInterval> | null = null
+
   // ══════════════════════════════════════════════════════════
   // Getters（算出プロパティ）
   // computed() でリアクティブな算出値を作成する。
@@ -327,6 +330,29 @@ export const usePlayersStore = defineStore('players', () => {
   }
 
   // ─────────────────────────────────────────────────────────
+  // startPolling - 3秒ごとにサーバーと自動同期を開始する
+  //
+  // 管理者がチーム分けを実行したとき、一般ユーザー画面にも
+  // 自動的に結果が反映されるようにするためのポーリング処理。
+  // ─────────────────────────────────────────────────────────
+  function startPolling() {
+    if (pollingTimer !== null) return // 二重起動防止
+    pollingTimer = setInterval(async () => {
+      await Promise.all([fetchPlayers(), fetchTeams()])
+    }, 3000)
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // stopPolling - 自動同期を停止する（コンポーネント破棄時に呼ぶ）
+  // ─────────────────────────────────────────────────────────
+  function stopPolling() {
+    if (pollingTimer !== null) {
+      clearInterval(pollingTimer)
+      pollingTimer = null
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
   // initialize - アプリ起動時に呼ぶ初期化関数
   // 全データをサーバーから取得する
   // ─────────────────────────────────────────────────────────
@@ -354,6 +380,8 @@ export const usePlayersStore = defineStore('players', () => {
     playerCount,
     // Actions
     initialize,
+    startPolling,
+    stopPolling,
     fetchPlayers,
     fetchConfig,
     fetchTeams,

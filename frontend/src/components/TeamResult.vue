@@ -53,9 +53,11 @@ function barPct(score: number) { return `${Math.round((score / maxScore.value) *
     <div
       class="grid gap-4"
       :class="{
-        'grid-cols-2': (store.teams?.length ?? 0) <= 2,
+        'grid-cols-2': (store.teams?.length ?? 0) === 2,
         'grid-cols-3': (store.teams?.length ?? 0) === 3,
-        'grid-cols-2': (store.teams?.length ?? 0) >= 4,
+        'grid-cols-2 lg:grid-cols-4': (store.teams?.length ?? 0) === 4,
+        'grid-cols-3 lg:grid-cols-5': (store.teams?.length ?? 0) === 5,
+        'grid-cols-3 lg:grid-cols-6': (store.teams?.length ?? 0) >= 6,
       }"
     >
       <div

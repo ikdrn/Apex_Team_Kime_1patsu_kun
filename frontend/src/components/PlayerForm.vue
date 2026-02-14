@@ -4,7 +4,7 @@ import { RANK_LIST } from '@/types'
 import type { Player, RankName } from '@/types'
 import { usePlayersStore } from '@/stores/players'
 
-const props = defineProps<{ isOwner: boolean; editTarget: Player | null }>()
+const props = defineProps<{ addForOther: boolean; editTarget: Player | null }>()
 const emit = defineEmits<{ done: []; cancel: [] }>()
 const store = usePlayersStore()
 
@@ -26,7 +26,7 @@ async function handleSubmit() {
       const ok = await store.updatePlayer(props.editTarget.id, name, rankInput.value)
       if (ok) emit('done')
     } else {
-      const player = await store.addPlayer(name, rankInput.value, !props.isOwner)
+      const player = await store.addPlayer(name, rankInput.value, !props.addForOther)
       if (player) { nameInput.value = ''; rankInput.value = 'ゴールド'; emit('done') }
     }
   } finally { isSubmitting.value = false }

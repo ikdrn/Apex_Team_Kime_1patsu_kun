@@ -14,6 +14,16 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import UserView from '@/views/UserView.vue'
 import OwnerView from '@/views/OwnerView.vue'
+import DocsView from '@/views/DocsView.vue'
+import RequirementsDoc from '@/views/docs/RequirementsDoc.vue'
+import BasicDesignDoc from '@/views/docs/BasicDesignDoc.vue'
+import DetailedDesignDoc from '@/views/docs/DetailedDesignDoc.vue'
+import UnitTestSpecDoc from '@/views/docs/UnitTestSpecDoc.vue'
+import UnitTestEvidenceDoc from '@/views/docs/UnitTestEvidenceDoc.vue'
+import IntegrationTestSpecDoc from '@/views/docs/IntegrationTestSpecDoc.vue'
+import IntegrationTestEvidenceDoc from '@/views/docs/IntegrationTestEvidenceDoc.vue'
+import SystemTestSpecDoc from '@/views/docs/SystemTestSpecDoc.vue'
+import SystemTestEvidenceDoc from '@/views/docs/SystemTestEvidenceDoc.vue'
 
 const router = createRouter({
   // createWebHistory: HTML5 History APIを使用（URLにハッシュ#が付かない）
@@ -39,6 +49,67 @@ const router = createRouter({
         title: 'チーム決め一発くん - 管理者',
         isOwner: true,
       },
+    },
+    // ── 設計書（管理者専用） ──
+    {
+      path: '/owner/docs',
+      name: 'docs',
+      component: DocsView,
+      meta: { title: '設計書一覧 - チーム決め一発くん', isOwner: true },
+    },
+    {
+      path: '/owner/docs/requirements',
+      name: 'docs-requirements',
+      component: RequirementsDoc,
+      meta: { title: '要件定義書', isOwner: true },
+    },
+    {
+      path: '/owner/docs/basic-design',
+      name: 'docs-basic-design',
+      component: BasicDesignDoc,
+      meta: { title: '基本設計書', isOwner: true },
+    },
+    {
+      path: '/owner/docs/detailed-design',
+      name: 'docs-detailed-design',
+      component: DetailedDesignDoc,
+      meta: { title: '詳細設計書', isOwner: true },
+    },
+    {
+      path: '/owner/docs/unit-test-spec',
+      name: 'docs-unit-test-spec',
+      component: UnitTestSpecDoc,
+      meta: { title: '単体テスト仕様書', isOwner: true },
+    },
+    {
+      path: '/owner/docs/unit-test-evidence',
+      name: 'docs-unit-test-evidence',
+      component: UnitTestEvidenceDoc,
+      meta: { title: '単体テスト証跡', isOwner: true },
+    },
+    {
+      path: '/owner/docs/integration-test-spec',
+      name: 'docs-integration-test-spec',
+      component: IntegrationTestSpecDoc,
+      meta: { title: '結合テスト仕様書', isOwner: true },
+    },
+    {
+      path: '/owner/docs/integration-test-evidence',
+      name: 'docs-integration-test-evidence',
+      component: IntegrationTestEvidenceDoc,
+      meta: { title: '結合テスト証跡', isOwner: true },
+    },
+    {
+      path: '/owner/docs/system-test-spec',
+      name: 'docs-system-test-spec',
+      component: SystemTestSpecDoc,
+      meta: { title: '総合テスト仕様書', isOwner: true },
+    },
+    {
+      path: '/owner/docs/system-test-evidence',
+      name: 'docs-system-test-evidence',
+      component: SystemTestEvidenceDoc,
+      meta: { title: '総合テスト証跡', isOwner: true },
     },
     {
       // 定義されていないパスはすべてユーザー画面にリダイレクト
