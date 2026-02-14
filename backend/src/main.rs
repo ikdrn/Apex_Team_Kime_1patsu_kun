@@ -312,9 +312,9 @@ async fn update_player(
         player.display_name = None;
         let updated = player.clone();
         state.teams = None;
-        return (StatusCode::OK, Json(serde_json::json!({ "player": updated })));
+        return (StatusCode::OK, Json(serde_json::json!({ "player": updated }))).into_response();
     }
-    (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "プレイヤーが見つかりません" })))
+    (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "プレイヤーが見つかりません" }))).into_response()
 }
 
 async fn delete_player(
@@ -354,9 +354,9 @@ async fn adjust_offset(
         player.score_offset = (player.score_offset + delta).clamp(-3, 3);
         let updated = player.clone();
         state.teams = None;
-        return (StatusCode::OK, Json(serde_json::json!({ "player": updated })));
+        return (StatusCode::OK, Json(serde_json::json!({ "player": updated }))).into_response();
     }
-    (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "プレイヤーが見つかりません" })))
+    (StatusCode::NOT_FOUND, Json(serde_json::json!({ "error": "プレイヤーが見つかりません" }))).into_response()
 }
 
 async fn get_config(State(state): State<SharedState>) -> impl IntoResponse {
