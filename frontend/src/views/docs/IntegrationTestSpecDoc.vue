@@ -135,7 +135,7 @@ const router = useRouter()
                 <tr v-for="tc in [
                   ['IT-C-01', 'チーム数変更後、設定が反映されること', 'PUT /api/config → GET /api/config', '変更したteam_countが取得できる'],
                   ['IT-C-02', 'チーム数を1にしても2になること（最小値保護）', 'PUT /api/config (team_count:1)', 'team_count = 2 が返却される'],
-                  ['IT-C-03', 'ヘルスチェックが正常応答すること', 'GET /health', 'HTTP 200 / {\"status\":\"ok\"} 返却'],
+                  ['IT-C-03', 'ヘルスチェックが正常応答すること', 'GET /health', 'HTTP 200 / {&quot;status&quot;:&quot;ok&quot;} 返却'],
                 ]" :key="tc[0]" class="hover:bg-neutral-50">
                   <td class="border border-neutral-200 px-3 py-2 font-mono text-neutral-600">{{ tc[0] }}</td>
                   <td class="border border-neutral-200 px-3 py-2">{{ tc[1] }}</td>

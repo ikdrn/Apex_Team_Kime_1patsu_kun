@@ -46,10 +46,11 @@ RUN npm run build
 # ──────────────────────────────────────────────────────────────
 # Stage 2: バックエンド（Rust）のビルド
 #
-# rust:1.81-alpine = Alpine Linux ベースの Rust コンパイライメージ
+# rust:1.85-alpine = Alpine Linux ベースの Rust コンパイライメージ
 # Alpine は musl libc を使うため、生成バイナリは静的リンクされる
+# 1.85 以上が必要: getrandom 0.4+ が edition2024 を使用するため
 # ──────────────────────────────────────────────────────────────
-FROM rust:1.81-alpine AS backend-builder
+FROM rust:1.85-alpine AS backend-builder
 
 # musl-dev: musl libc 用の C コンパイルヘッダー
 # （tokio など一部クレートのビルドに必要）
