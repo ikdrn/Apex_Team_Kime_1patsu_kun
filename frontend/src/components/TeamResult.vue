@@ -17,12 +17,12 @@ const scoreDiff = computed(() => {
 })
 
 const teamStyles = [
-  { color: '#2563eb', labelClass: 'text-blue-600',    softBg: 'bg-blue-50',   bar: 'bg-blue-500',   ring: 'ring-blue-200'   },
-  { color: '#ea580c', labelClass: 'text-orange-600',  softBg: 'bg-orange-50', bar: 'bg-orange-500', ring: 'ring-orange-200' },
-  { color: '#059669', labelClass: 'text-emerald-600', softBg: 'bg-emerald-50',bar: 'bg-emerald-500',ring: 'ring-emerald-200'},
-  { color: '#dc2626', labelClass: 'text-red-600',     softBg: 'bg-red-50',    bar: 'bg-red-500',    ring: 'ring-red-200'    },
-  { color: '#7c3aed', labelClass: 'text-violet-600',  softBg: 'bg-violet-50', bar: 'bg-violet-500', ring: 'ring-violet-200' },
-  { color: '#d97706', labelClass: 'text-amber-600',   softBg: 'bg-amber-50',  bar: 'bg-amber-500',  ring: 'ring-amber-200'  },
+  { labelClass: 'text-blue-600',    softBg: 'bg-blue-50',    bar: 'bg-blue-500'    },
+  { labelClass: 'text-orange-600',  softBg: 'bg-orange-50',  bar: 'bg-orange-500'  },
+  { labelClass: 'text-emerald-600', softBg: 'bg-emerald-50', bar: 'bg-emerald-500' },
+  { labelClass: 'text-red-600',     softBg: 'bg-red-50',     bar: 'bg-red-500'     },
+  { labelClass: 'text-violet-600',  softBg: 'bg-violet-50',  bar: 'bg-violet-500'  },
+  { labelClass: 'text-amber-600',   softBg: 'bg-amber-50',   bar: 'bg-amber-500'   },
 ]
 
 function ts(id: number) { return teamStyles[(id - 1) % teamStyles.length] }

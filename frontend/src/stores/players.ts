@@ -120,13 +120,15 @@ export const usePlayersStore = defineStore('players', () => {
 
   // ─────────────────────────────────────────────────────────
   // fetchConfig - 設定を取得する
+  //
+  // silent=true のときはコンソールエラーを出力しない（バックグラウンドポーリング用）
   // ─────────────────────────────────────────────────────────
-  async function fetchConfig() {
+  async function fetchConfig(silent = false) {
     try {
       const res = await api.get<{ config: AppConfig }>('/config')
       config.value = res.data.config
     } catch (e) {
-      console.error('[fetchConfig]', e)
+      if (!silent) console.error('[fetchConfig]', e)
     }
   }
 
@@ -142,7 +144,7 @@ export const usePlayersStore = defineStore('players', () => {
     } catch (e: any) {
       // 404はチーム分け未実行を意味するため、エラーとして扱わない
       if (e.response?.status !== 404) {
-        console.error('[fetchTeams]', e)
+        if (!silent) console.error('[fetchTeams]', e)
       }
     }
   }
@@ -252,6 +254,7 @@ export const usePlayersStore = defineStore('players', () => {
   // ─────────────────────────────────────────────────────────
   async function adjustScoreOffset(id: string, delta: number): Promise<boolean> {
     try {
+      isLoading.value = true
       const res = await api.patch<{ player: Player }>(`/players/${id}/offset`, { delta })
       const updated = res.data.player
 
@@ -266,6 +269,8 @@ export const usePlayersStore = defineStore('players', () => {
       setError(e.response?.data?.error ?? 'スコア補正の変更に失敗しました')
       console.error('[adjustScoreOffset]', e)
       return false
+    } finally {
+      isLoading.value = false
     }
   }
 
@@ -343,7 +348,7 @@ export const usePlayersStore = defineStore('players', () => {
   function startPolling() {
     if (pollingTimer !== null) return // 二重起動防止
     pollingTimer = setInterval(async () => {
-      await Promise.all([fetchPlayers(true), fetchTeams(true), fetchConfig()])
+      await Promise.all([fetchPlayers(true), fetchTeams(true), fetchConfig(true)])
     }, 3000)
   }
 
